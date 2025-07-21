@@ -70,6 +70,18 @@ abstract class Env {
   
   @EnviedField(varName: 'BACKTEST_MODE', defaultValue: false)
   static const bool backtestMode = _Env.backtestMode;
+  
+  @EnviedField(varName: 'STARTING_EQUITY', defaultValue: 100000.0)
+  static const double startingEquity = _Env.startingEquity;
+  
+  @EnviedField(varName: 'USE_MARKET_ORDERS', defaultValue: false)
+  static const bool useMarketOrders = _Env.useMarketOrders;
+  
+  @EnviedField(varName: 'ALLOW_AFTER_HOURS_TRADING', defaultValue: false)
+  static const bool allowAfterHoursTrading = _Env.allowAfterHoursTrading;
+  
+  @EnviedField(varName: 'TRADING_BRIDGE_PORT', defaultValue: 50053)
+  static const int tradingBridgePort = _Env.tradingBridgePort;
 }
 
 class AppConfig {
@@ -101,6 +113,10 @@ class AppConfig {
   static const double lowVolPositionSize = 0.01;
   static const double minStopLoss = 0.01; // 1%
   static const double rewardRiskRatio = 2.0;
+  static const double maxDrawdown = 0.03; // 3%
+  static const int maxPositions = 10;
+  static const double maxPositionSize = 0.05; // 5%
+  static const double maxPortfolioHeat = 0.15; // 15%
   
   // Database connection string
   static String get postgresConnectionString => 
@@ -124,5 +140,11 @@ class AppConfig {
     final hour = now.hour;
     final isWeekday = now.weekday >= 1 && now.weekday <= 5;
     return isWeekday && hour >= marketOpenHour && hour < marketCloseHour;
+  }
+  
+  /// Initialize app configuration
+  static Future<void> initialize() async {
+    // Add any async initialization logic here
+    await Future.delayed(Duration.zero); // Placeholder
   }
 }

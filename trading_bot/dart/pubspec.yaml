@@ -10,54 +10,47 @@ dependencies:
   flutter:
     sdk: flutter
   
-  # UI & Charts
-  syncfusion_flutter_charts: ^25.2.7
+  # State Management
   flutter_riverpod: ^2.4.9
-  go_router: ^14.2.7
+  riverpod_annotation: ^2.3.3
   
-  # WebSocket & HTTP
+  # Charts and UI
+  syncfusion_flutter_charts: ^24.1.41
+  syncfusion_flutter_core: ^24.1.41
+  syncfusion_flutter_datagrid: ^24.1.41
+  
+  # Existing dependencies
   web_socket_channel: ^2.4.0
   http: ^1.1.0
-  dio: ^5.4.0
-  
-  # gRPC
+  dio: ^5.3.2
   grpc: ^3.2.4
   protobuf: ^3.1.0
-  
-  # Database & Cache
   postgres: ^2.6.2
   redis: ^3.1.0
-  
-  # State Management & Async
   rxdart: ^0.27.7
   isolate_contactor: ^4.0.0
-  
-  # Configuration & Environment
-  envied: ^0.5.4+1
-  
-  # Utilities
-  intl: ^0.19.0
-  uuid: ^4.2.1
+  envied: ^0.5.3
   logger: ^2.0.2+1
   json_annotation: ^4.8.1
-  
-  # Math & Statistics
-  ml_linalg: ^13.19.0
+  ml_linalg: ^13.16.1
   collection: ^1.18.0
+  
+  # Additional UI packages
+  flutter_animate: ^4.3.0
+  gap: ^3.0.1
+  google_fonts: ^6.1.0
+  
+  # WebSocket client for dashboard
+  web_socket_channel: ^2.4.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
-  
-  # Code Generation
   build_runner: ^2.4.7
   json_serializable: ^6.7.1
-  envied_generator: ^0.5.4+1
-  
-  # Testing
-  mockito: ^5.4.4
-  test: ^1.24.9
+  riverpod_generator: ^2.3.9
+  riverpod_lint: ^2.3.7
 
 flutter:
   uses-material-design: true
