@@ -1,0 +1,149 @@
+syntax = "proto3";
+
+package ta_service;
+
+// Technical Analysis Service
+service TechnicalAnalysisService {
+  // Get RSI for a given price series
+  rpc GetRSI(RSIRequest) returns (RSIResponse);
+  
+  // Get MACD for a given price series
+  rpc GetMACD(MACDRequest) returns (MACDResponse);
+  
+  // Get Bollinger Bands
+  rpc GetBollingerBands(BollingerBandsRequest) returns (BollingerBandsResponse);
+  
+  // Get Average True Range
+  rpc GetATR(ATRRequest) returns (ATRResponse);
+  
+  // Get Moving Averages
+  rpc GetMovingAverages(MovingAveragesRequest) returns (MovingAveragesResponse);
+  
+  // Get all indicators for a symbol
+  rpc GetAllIndicators(AllIndicatorsRequest) returns (AllIndicatorsResponse);
+  
+  // Get trading signals
+  rpc GetSignals(SignalsRequest) returns (SignalsResponse);
+}
+
+// Price data for calculations
+message PriceData {
+  repeated double open = 1;
+  repeated double high = 2;
+  repeated double low = 3;
+  repeated double close = 4;
+  repeated int64 volume = 5;
+  repeated int64 timestamp = 6;
+}
+
+// RSI Request/Response
+message RSIRequest {
+  PriceData prices = 1;
+  int32 period = 2; // default 14
+}
+
+message RSIResponse {
+  repeated double rsi = 1;
+  double current_rsi = 2;
+}
+
+// MACD Request/Response
+message MACDRequest {
+  PriceData prices = 1;
+  int32 fast_period = 2; // default 12
+  int32 slow_period = 3; // default 26
+  int32 signal_period = 4; // default 9
+}
+
+message MACDResponse {
+  repeated double macd = 1;
+  repeated double signal = 2;
+  repeated double histogram = 3;
+  double current_macd = 4;
+  double current_signal = 5;
+  double current_histogram = 6;
+  bool bullish_crossover = 7;
+  bool bearish_crossover = 8;
+}
+
+// Bollinger Bands Request/Response
+message BollingerBandsRequest {
+  PriceData prices = 1;
+  int32 period = 2; // default 20
+  double std_dev = 3; // default 2.0
+}
+
+message BollingerBandsResponse {
+  repeated double upper = 1;
+  repeated double middle = 2;
+  repeated double lower = 3;
+  double current_upper = 4;
+  double current_middle = 5;
+  double current_lower = 6;
+  double bandwidth = 7;
+  double percent_b = 8;
+}
+
+// ATR Request/Response
+message ATRRequest {
+  PriceData prices = 1;
+  int32 period = 2; // default 14
+}
+
+message ATRResponse {
+  repeated double atr = 1;
+  double current_atr = 2;
+}
+
+// Moving Averages Request/Response
+message MovingAveragesRequest {
+  PriceData prices = 1;
+  repeated int32 periods = 2; // e.g., [20, 50, 200]
+  string ma_type = 3; // "SMA", "EMA", "WMA"
+}
+
+message MovingAveragesResponse {
+  map<int32, MovingAverageResult> results = 1;
+}
+
+message MovingAverageResult {
+  repeated double values = 1;
+  double current_value = 2;
+}
+
+// All Indicators Request/Response
+message AllIndicatorsRequest {
+  string symbol = 1;
+  PriceData prices = 2;
+}
+
+message AllIndicatorsResponse {
+  RSIResponse rsi = 1;
+  MACDResponse macd = 2;
+  BollingerBandsResponse bollinger = 3;
+  ATRResponse atr = 4;
+  MovingAveragesResponse moving_averages = 5;
+}
+
+// Trading Signals Request/Response
+message SignalsRequest {
+  string symbol = 1;
+  PriceData prices = 2;
+  double current_price = 3;
+  int64 volume = 4;
+  double volume_avg = 5;
+}
+
+message SignalsResponse {
+  repeated TradingSignal signals = 1;
+  double overall_strength = 2;
+  string overall_direction = 3; // "BUY", "SELL", "HOLD"
+}
+
+message TradingSignal {
+  string indicator = 1;
+  string direction = 2; // "BUY", "SELL", "HOLD"
+  double strength = 3; // 0.0 to 1.0
+  string reason = 4;
+  map<string, double> metadata = 5;
+}

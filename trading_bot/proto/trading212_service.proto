@@ -1,0 +1,248 @@
+syntax = "proto3";
+
+package trading212_service;
+
+// Trading212 Bridge Service
+service Trading212Service {
+  // Place a market order
+  rpc PlaceMarketOrder(MarketOrderRequest) returns (OrderResponse);
+  
+  // Place a limit order
+  rpc PlaceLimitOrder(LimitOrderRequest) returns (OrderResponse);
+  
+  // Place a stop order
+  rpc PlaceStopOrder(StopOrderRequest) returns (OrderResponse);
+  
+  // Place a bracket order (entry + stop + take profit)
+  rpc PlaceBracketOrder(BracketOrderRequest) returns (BracketOrderResponse);
+  
+  // Cancel an order
+  rpc CancelOrder(CancelOrderRequest) returns (CancelOrderResponse);
+  
+  // Get order status
+  rpc GetOrderStatus(OrderStatusRequest) returns (OrderStatusResponse);
+  
+  // Get account info
+  rpc GetAccountInfo(AccountInfoRequest) returns (AccountInfoResponse);
+  
+  // Get positions
+  rpc GetPositions(PositionsRequest) returns (PositionsResponse);
+  
+  // Get portfolio summary
+  rpc GetPortfolio(PortfolioRequest) returns (PortfolioResponse);
+  
+  // Update stop loss
+  rpc UpdateStopLoss(UpdateStopLossRequest) returns (UpdateStopLossResponse);
+  
+  // Update take profit
+  rpc UpdateTakeProfit(UpdateTakeProfitRequest) returns (UpdateTakeProfitResponse);
+  
+  // Get market data
+  rpc GetMarketData(MarketDataRequest) returns (MarketDataResponse);
+}
+
+// Order Types
+enum OrderType {
+  MARKET = 0;
+  LIMIT = 1;
+  STOP = 2;
+  STOP_LIMIT = 3;
+}
+
+enum OrderSide {
+  BUY = 0;
+  SELL = 1;
+}
+
+enum OrderStatus {
+  PENDING = 0;
+  FILLED = 1;
+  PARTIALLY_FILLED = 2;
+  CANCELLED = 3;
+  REJECTED = 4;
+}
+
+// Market Order Request/Response
+message MarketOrderRequest {
+  string symbol = 1;
+  OrderSide side = 2;
+  double quantity = 3;
+  string client_order_id = 4;
+}
+
+// Limit Order Request
+message LimitOrderRequest {
+  string symbol = 1;
+  OrderSide side = 2;
+  double quantity = 3;
+  double price = 4;
+  string client_order_id = 5;
+  int64 time_in_force = 6; // seconds, 0 = GTC
+}
+
+// Stop Order Request
+message StopOrderRequest {
+  string symbol = 1;
+  OrderSide side = 2;
+  double quantity = 3;
+  double stop_price = 4;
+  string client_order_id = 5;
+}
+
+// Bracket Order Request
+message BracketOrderRequest {
+  string symbol = 1;
+  OrderSide side = 2;
+  double quantity = 3;
+  double entry_price = 4; // 0 for market order
+  double stop_loss_price = 5;
+  double take_profit_price = 6;
+  string client_order_id = 7;
+}
+
+// Order Response
+message OrderResponse {
+  bool success = 1;
+  string message = 2;
+  string order_id = 3;
+  string client_order_id = 4;
+  OrderStatus status = 5;
+  double filled_quantity = 6;
+  double filled_price = 7;
+  int64 timestamp = 8;
+}
+
+// Bracket Order Response
+message BracketOrderResponse {
+  bool success = 1;
+  string message = 2;
+  string entry_order_id = 3;
+  string stop_loss_order_id = 4;
+  string take_profit_order_id = 5;
+  string client_order_id = 6;
+}
+
+// Cancel Order Request/Response
+message CancelOrderRequest {
+  string order_id = 1;
+}
+
+message CancelOrderResponse {
+  bool success = 1;
+  string message = 2;
+  string order_id = 3;
+}
+
+// Order Status Request/Response
+message OrderStatusRequest {
+  string order_id = 1;
+}
+
+message OrderStatusResponse {
+  bool success = 1;
+  string order_id = 2;
+  OrderStatus status = 3;
+  double filled_quantity = 4;
+  double filled_price = 5;
+  double remaining_quantity = 6;
+  int64 created_at = 7;
+  int64 updated_at = 8;
+}
+
+// Account Info Request/Response
+message AccountInfoRequest {}
+
+message AccountInfoResponse {
+  bool success = 1;
+  string message = 2;
+  double total_equity = 3;
+  double available_cash = 4;
+  double used_margin = 5;
+  double free_margin = 6;
+  double unrealized_pnl = 7;
+  double realized_pnl = 8;
+  string currency = 9;
+  bool is_demo = 10;
+}
+
+// Positions Request/Response
+message PositionsRequest {}
+
+message PositionsResponse {
+  bool success = 1;
+  string message = 2;
+  repeated Position positions = 3;
+}
+
+message Position {
+  string symbol = 1;
+  OrderSide side = 2;
+  double quantity = 3;
+  double average_price = 4;
+  double current_price = 5;
+  double unrealized_pnl = 6;
+  double unrealized_pnl_percent = 7;
+  int64 opened_at = 8;
+  string position_id = 9;
+  double stop_loss = 10;
+  double take_profit = 11;
+}
+
+// Portfolio Request/Response
+message PortfolioRequest {}
+
+message PortfolioResponse {
+  bool success = 1;
+  string message = 2;
+  double total_equity = 3;
+  double total_pnl = 4;
+  double daily_pnl = 5;
+  double total_pnl_percent = 6;
+  double daily_pnl_percent = 7;
+  int32 open_positions = 8;
+  repeated Position positions = 9;
+}
+
+// Update Stop Loss Request/Response
+message UpdateStopLossRequest {
+  string position_id = 1;
+  double stop_loss_price = 2;
+}
+
+message UpdateStopLossResponse {
+  bool success = 1;
+  string message = 2;
+  string position_id = 3;
+  double new_stop_loss = 4;
+}
+
+// Update Take Profit Request/Response
+message UpdateTakeProfitRequest {
+  string position_id = 1;
+  double take_profit_price = 2;
+}
+
+message UpdateTakeProfitResponse {
+  bool success = 1;
+  string message = 2;
+  string position_id = 3;
+  double new_take_profit = 4;
+}
+
+// Market Data Request/Response
+message MarketDataRequest {
+  string symbol = 1;
+}
+
+message MarketDataResponse {
+  bool success = 1;
+  string message = 2;
+  string symbol = 3;
+  double current_price = 4;
+  double bid = 5;
+  double ask = 6;
+  double daily_change = 7;
+  double daily_change_percent = 8;
+  int64 volume = 9;
+  int64 timestamp = 10;
+}

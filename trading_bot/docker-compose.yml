@@ -1,0 +1,310 @@
+version: '3.8'
+
+services:
+  # Database Services
+  postgres:
+    image: postgres:15-alpine
+    container_name: trading_bot_postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-trading_bot}
+      POSTGRES_USER: ${POSTGRES_USER:-trading_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secure_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - trading_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-trading_user}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: trading_bot_redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - trading_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Python Microservices
+  ta_service:
+    build:
+      context: ./python
+      dockerfile: Dockerfile.ta_service
+    container_name: trading_bot_ta_service
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    ports:
+      - "50051:50051"
+    networks:
+      - trading_network
+    restart: unless-stopped
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "grpcurl", "-plaintext", "localhost:50051", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  trading212_service:
+    build:
+      context: ./python
+      dockerfile: Dockerfile.trading212_bridge
+    container_name: trading_bot_trading212_service
+    environment:
+      - T212_EMAIL=${T212_EMAIL}
+      - T212_PASSWORD=${T212_PASSWORD}
+      - T212_MODE=${T212_MODE:-demo}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    ports:
+      - "50053:50053"
+    networks:
+      - trading_network
+    restart: unless-stopped
+    volumes:
+      - /dev/shm:/dev/shm  # Required for Chrome headless
+    healthcheck:
+      test: ["CMD", "grpcurl", "-plaintext", "localhost:50053", "list"]
+      interval: 60s
+      timeout: 30s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+
+  # ML Service (Optional)
+  ml_service:
+    build:
+      context: ./python
+      dockerfile: Dockerfile.ml_service
+    container_name: trading_bot_ml_service
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    ports:
+      - "50052:50052"
+    networks:
+      - trading_network
+    restart: unless-stopped
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "grpcurl", "-plaintext", "localhost:50052", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Dart Application
+  dart_app:
+    build:
+      context: ./dart
+      dockerfile: Dockerfile
+    container_name: trading_bot_dart_app
+    environment:
+      - POLYGON_API_KEY=${POLYGON_API_KEY}
+      - ALPHA_VANTAGE_API_KEY=${ALPHA_VANTAGE_API_KEY}
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-trading_bot}
+      - POSTGRES_USER=${POSTGRES_USER:-trading_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-secure_password}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - TA_SERVICE_PORT=50051
+      - ML_SERVICE_PORT=50052
+      - TRADING212_BRIDGE_PORT=50053
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DEBUG_MODE=${DEBUG_MODE:-true}
+    networks:
+      - trading_network
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ta_service:
+        condition: service_healthy
+      trading212_service:
+        condition: service_healthy
+
+  # Flutter Web Dashboard
+  flutter_web:
+    build:
+      context: ./dart
+      dockerfile: Dockerfile.web
+    container_name: trading_bot_web_dashboard
+    ports:
+      - "8080:8080"
+    networks:
+      - trading_network
+    restart: unless-stopped
+    depends_on:
+      - dart_app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Monitoring & Observability
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: trading_bot_prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - trading_network
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: trading_bot_grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    networks:
+      - trading_network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+  # Log Aggregation
+  loki:
+    image: grafana/loki:latest
+    container_name: trading_bot_loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./monitoring/loki-config.yaml:/etc/loki/local-config.yaml
+      - loki_data:/loki
+    networks:
+      - trading_network
+    restart: unless-stopped
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: trading_bot_promtail
+    volumes:
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./monitoring/promtail-config.yaml:/etc/promtail/config.yml
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - trading_network
+    restart: unless-stopped
+    depends_on:
+      - loki
+
+  # Reverse Proxy & Load Balancer
+  nginx:
+    image: nginx:alpine
+    container_name: trading_bot_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+    networks:
+      - trading_network
+    restart: unless-stopped
+    depends_on:
+      - flutter_web
+      - grafana
+
+  # Backup Service
+  backup:
+    image: postgres:15-alpine
+    container_name: trading_bot_backup
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=${POSTGRES_DB:-trading_bot}
+      - POSTGRES_USER=${POSTGRES_USER:-trading_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-secure_password}
+    volumes:
+      - ./backups:/backups
+      - ./scripts/backup.sh:/backup.sh
+    command: |
+      sh -c "
+        chmod +x /backup.sh &&
+        crond -f
+      "
+    networks:
+      - trading_network
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+networks:
+  trading_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  loki_data:
+    driver: local
+
+# Health Check Service
+  healthcheck:
+    image: alpine:latest
+    container_name: trading_bot_healthcheck
+    command: |
+      sh -c "
+        apk add --no-cache curl &&
+        while true; do
+          echo 'Running health checks...'
+          curl -f http://flutter_web:8080/ || echo 'Web dashboard unhealthy'
+          curl -f http://grafana:3000/api/health || echo 'Grafana unhealthy'
+          sleep 60
+        done
+      "
+    networks:
+      - trading_network
+    restart: unless-stopped
+    depends_on:
+      - flutter_web
+      - grafana
