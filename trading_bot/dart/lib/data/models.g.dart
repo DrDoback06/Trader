@@ -1,7 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
-// This is a minimal implementation for production readiness demo
 
-import 'models.dart';
+part of 'models.dart';
 
 // Tick JSON serialization
 Tick _$TickFromJson(Map<String, dynamic> json) => Tick(
@@ -9,6 +8,7 @@ Tick _$TickFromJson(Map<String, dynamic> json) => Tick(
   price: (json['price'] as num).toDouble(),
   volume: json['volume'] as int,
   timestamp: DateTime.parse(json['timestamp'] as String),
+  exchange: json['exchange'] as String,
 );
 
 Map<String, dynamic> _$TickToJson(Tick instance) => <String, dynamic>{
@@ -16,6 +16,7 @@ Map<String, dynamic> _$TickToJson(Tick instance) => <String, dynamic>{
   'price': instance.price,
   'volume': instance.volume,
   'timestamp': instance.timestamp.toIso8601String(),
+  'exchange': instance.exchange,
 };
 
 // Bar JSON serialization
@@ -80,12 +81,14 @@ BollingerBands _$BollingerBandsFromJson(Map<String, dynamic> json) => BollingerB
   upper: (json['upper'] as num).toDouble(),
   middle: (json['middle'] as num).toDouble(),
   lower: (json['lower'] as num).toDouble(),
+  bandwidth: (json['bandwidth'] as num).toDouble(),
 );
 
 Map<String, dynamic> _$BollingerBandsToJson(BollingerBands instance) => <String, dynamic>{
   'upper': instance.upper,
   'middle': instance.middle,
   'lower': instance.lower,
+  'bandwidth': instance.bandwidth,
 };
 
 // Signal JSON serialization
@@ -311,6 +314,7 @@ RiskMetrics _$RiskMetricsFromJson(Map<String, dynamic> json) => RiskMetrics(
   openPositions: json['openPositions'] as int,
   leverageRatio: (json['leverageRatio'] as num).toDouble(),
   riskScore: (json['riskScore'] as num).toDouble(),
+  circuitBreakerActive: json['circuitBreakerActive'] as bool,
 );
 
 Map<String, dynamic> _$RiskMetricsToJson(RiskMetrics instance) => <String, dynamic>{
@@ -322,6 +326,7 @@ Map<String, dynamic> _$RiskMetricsToJson(RiskMetrics instance) => <String, dynam
   'openPositions': instance.openPositions,
   'leverageRatio': instance.leverageRatio,
   'riskScore': instance.riskScore,
+  'circuitBreakerActive': instance.circuitBreakerActive,
 };
 
 // Helper function for enum decoding

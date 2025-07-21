@@ -61,24 +61,20 @@ class Bar {
 class TechnicalIndicators {
   final double? rsi;
   final MacdIndicator? macd;
-  final BollingerBands? bollinger;
-  final double? atr;
   final double? sma20;
   final double? sma50;
   final double? ema12;
   final double? ema26;
-  final double? volumeAvg;
+  final BollingerBands? bollingerBands;
 
   const TechnicalIndicators({
     this.rsi,
     this.macd,
-    this.bollinger,
-    this.atr,
     this.sma20,
     this.sma50,
     this.ema12,
     this.ema26,
-    this.volumeAvg,
+    this.bollingerBands,
   });
 
   factory TechnicalIndicators.fromJson(Map<String, dynamic> json) => 
@@ -88,13 +84,13 @@ class TechnicalIndicators {
 
 @JsonSerializable()
 class MacdIndicator {
-  final double macd;
-  final double signal;
+  final double macdLine;
+  final double signalLine;
   final double histogram;
 
   const MacdIndicator({
-    required this.macd,
-    required this.signal,
+    required this.macdLine,
+    required this.signalLine,
     required this.histogram,
   });
 
@@ -102,8 +98,8 @@ class MacdIndicator {
       _$MacdIndicatorFromJson(json);
   Map<String, dynamic> toJson() => _$MacdIndicatorToJson(this);
   
-  bool get isBullishCrossover => histogram > 0 && macd > signal;
-  bool get isBearishCrossover => histogram < 0 && macd < signal;
+  bool get isBullishCrossover => histogram > 0 && macdLine > signalLine;
+  bool get isBearishCrossover => histogram < 0 && macdLine < signalLine;
 }
 
 @JsonSerializable()
@@ -133,20 +129,24 @@ class BollingerBands {
 
 @JsonSerializable()
 class Signal {
+  final String id;
   final String symbol;
-  final SignalType type;
+  final OrderSide side;
   final double strength; // 0.0 to 1.0
-  final String source; // 'technical', 'sentiment', 'insider'
+  final String reason;
   final DateTime timestamp;
-  final Map<String, dynamic> metadata;
+  final String agent; // 'technical', 'sentiment', 'insider'
+  final double confidence;
 
   const Signal({
+    required this.id,
     required this.symbol,
-    required this.type,
+    required this.side,
     required this.strength,
-    required this.source,
+    required this.reason,
     required this.timestamp,
-    this.metadata = const {},
+    required this.agent,
+    required this.confidence,
   });
 
   factory Signal.fromJson(Map<String, dynamic> json) => _$SignalFromJson(json);
@@ -155,29 +155,35 @@ class Signal {
   factory Signal.buy({
     required String symbol,
     required double strength,
-    required String source,
-    Map<String, dynamic> metadata = const {},
+    required String agent,
+    required String reason,
+    double confidence = 0.8,
   }) => Signal(
+    id: 'signal_${DateTime.now().millisecondsSinceEpoch}',
     symbol: symbol,
-    type: SignalType.buy,
+    side: OrderSide.buy,
     strength: strength,
-    source: source,
+    reason: reason,
     timestamp: DateTime.now(),
-    metadata: metadata,
+    agent: agent,
+    confidence: confidence,
   );
   
   factory Signal.sell({
     required String symbol,
     required double strength,
-    required String source,
-    Map<String, dynamic> metadata = const {},
+    required String agent,
+    required String reason,
+    double confidence = 0.8,
   }) => Signal(
+    id: 'signal_${DateTime.now().millisecondsSinceEpoch}',
     symbol: symbol,
-    type: SignalType.sell,
+    side: OrderSide.sell,
     strength: strength,
-    source: source,
+    reason: reason,
     timestamp: DateTime.now(),
-    metadata: metadata,
+    agent: agent,
+    confidence: confidence,
   );
 }
 
@@ -196,22 +202,28 @@ enum SignalType {
 class TradeIntent {
   final String symbol;
   final OrderSide side;
-  final double percentOfEquity;
-  final double? stopLoss;
-  final double? takeProfit;
+  final int quantity;
+  final OrderType orderType;
+  final double? limitPrice;
+  final double? stopPrice;
+  final TimeInForce timeInForce;
+  final List<String> reasons;
   final double confidence;
+  final double riskScore;
   final DateTime timestamp;
-  final List<Signal> signals;
 
   const TradeIntent({
     required this.symbol,
     required this.side,
-    required this.percentOfEquity,
-    this.stopLoss,
-    this.takeProfit,
+    required this.quantity,
+    required this.orderType,
+    this.limitPrice,
+    this.stopPrice,
+    required this.timeInForce,
+    required this.reasons,
     required this.confidence,
+    required this.riskScore,
     required this.timestamp,
-    required this.signals,
   });
 
   factory TradeIntent.fromJson(Map<String, dynamic> json) => 
@@ -223,30 +235,34 @@ class TradeIntent {
 class Order {
   final String id;
   final String symbol;
-  final OrderType type;
   final OrderSide side;
-  final double quantity;
-  final double? price;
-  final double? stopPrice;
+  final int quantity;
+  final OrderType orderType;
   final OrderStatus status;
-  final DateTime createdAt;
-  final DateTime? filledAt;
-  final double? filledPrice;
-  final double? filledQuantity;
+  final double? limitPrice;
+  final double? stopPrice;
+  final TimeInForce timeInForce;
+  final int filledQuantity;
+  final double? averageFillPrice;
+  final double? commission;
+  final DateTime timestamp;
+  final DateTime? lastUpdated;
 
   const Order({
     required this.id,
     required this.symbol,
-    required this.type,
     required this.side,
     required this.quantity,
-    this.price,
-    this.stopPrice,
+    required this.orderType,
     required this.status,
-    required this.createdAt,
-    this.filledAt,
-    this.filledPrice,
-    this.filledQuantity,
+    this.limitPrice,
+    this.stopPrice,
+    required this.timeInForce,
+    this.filledQuantity = 0,
+    this.averageFillPrice,
+    this.commission,
+    required this.timestamp,
+    this.lastUpdated,
   });
 
   factory Order.fromJson(Map<String, dynamic> json) => _$OrderFromJson(json);
@@ -271,18 +287,35 @@ enum OrderSide {
   sell,
 }
 
+
+
+enum TimeInForce {
+  @JsonValue('day')
+  day,
+  @JsonValue('gtc')
+  gtc,
+  @JsonValue('ioc')
+  ioc,
+  @JsonValue('fok')
+  fok,
+}
+
 enum OrderStatus {
   @JsonValue('pending')
   pending,
+  @JsonValue('open')
+  open,
   @JsonValue('filled')
   filled,
-  @JsonValue('partially_filled')
+  @JsonValue('partiallyFilled')
   partiallyFilled,
   @JsonValue('cancelled')
   cancelled,
   @JsonValue('rejected')
   rejected,
 }
+
+
 
 @JsonSerializable()
 class Position {
@@ -331,23 +364,21 @@ class NewsItem {
   final String id;
   final String title;
   final String summary;
-  final String? content;
-  final String source;
+  final String url;
+  final String author;
   final DateTime publishedAt;
-  final List<String> symbols;
-  final double? sentimentScore; // -1.0 to 1.0
-  final String? category;
+  final double? sentiment;
+  final List<String> relevantSymbols;
 
   const NewsItem({
     required this.id,
     required this.title,
     required this.summary,
-    this.content,
-    required this.source,
+    required this.url,
+    required this.author,
     required this.publishedAt,
-    required this.symbols,
-    this.sentimentScore,
-    this.category,
+    this.sentiment,
+    required this.relevantSymbols,
   });
 
   factory NewsItem.fromJson(Map<String, dynamic> json) => 
@@ -358,34 +389,31 @@ class NewsItem {
 @JsonSerializable()
 class InsiderTransaction {
   final String symbol;
-  final String insiderName;
-  final String title;
-  final TransactionType transactionType;
-  final double shares;
-  final double? price;
-  final double? value;
+  final String personName;
+  final String transactionType;
+  final int sharesTraded;
+  final double pricePerShare;
   final DateTime filingDate;
   final DateTime transactionDate;
+  final double? sentiment;
 
   const InsiderTransaction({
     required this.symbol,
-    required this.insiderName,
-    required this.title,
+    required this.personName,
     required this.transactionType,
-    required this.shares,
-    this.price,
-    this.value,
+    required this.sharesTraded,
+    required this.pricePerShare,
     required this.filingDate,
     required this.transactionDate,
+    this.sentiment,
   });
 
   factory InsiderTransaction.fromJson(Map<String, dynamic> json) => 
       _$InsiderTransactionFromJson(json);
   Map<String, dynamic> toJson() => _$InsiderTransactionToJson(this);
   
-  bool get isBuy => transactionType == TransactionType.buy;
-  bool get isSell => transactionType == TransactionType.sell;
-  bool get isSignificant => (value ?? 0) > 100000; // > $100k
+  bool get isBuy => transactionType == 'buy';
+  bool get isSell => transactionType == 'sell';
 }
 
 enum TransactionType {
@@ -402,22 +430,20 @@ enum TransactionType {
 @JsonSerializable()
 class Portfolio {
   final double totalEquity;
-  final double availableCash;
-  final double totalPositionValue;
-  final double dailyPnl;
-  final double totalPnl;
-  final double leverage;
+  final double availableBuyingPower;
+  final double dayTradingBuyingPower;
   final List<Position> positions;
+  final double dayPnl;
+  final double totalPnl;
   final DateTime lastUpdated;
 
   const Portfolio({
     required this.totalEquity,
-    required this.availableCash,
-    required this.totalPositionValue,
-    required this.dailyPnl,
-    required this.totalPnl,
-    required this.leverage,
+    required this.availableBuyingPower,
+    required this.dayTradingBuyingPower,
     required this.positions,
+    required this.dayPnl,
+    required this.totalPnl,
     required this.lastUpdated,
   });
 
@@ -425,7 +451,7 @@ class Portfolio {
       _$PortfolioFromJson(json);
   Map<String, dynamic> toJson() => _$PortfolioToJson(this);
   
-  double get dailyPnlPercent => dailyPnl / totalEquity;
+  double get dailyPnlPercent => dayPnl / totalEquity;
   double get totalPnlPercent => totalPnl / (totalEquity - totalPnl);
   int get positionCount => positions.length;
 }
@@ -440,6 +466,7 @@ class RiskMetrics {
   final int openPositions;
   final double leverageRatio;
   final double riskScore;
+  final bool circuitBreakerActive;
 
   const RiskMetrics({
     required this.portfolioHeat,
@@ -450,6 +477,7 @@ class RiskMetrics {
     required this.openPositions,
     required this.leverageRatio,
     required this.riskScore,
+    required this.circuitBreakerActive,
   });
 
   factory RiskMetrics.fromJson(Map<String, dynamic> json) => 

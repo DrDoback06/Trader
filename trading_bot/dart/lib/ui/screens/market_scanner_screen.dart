@@ -223,15 +223,15 @@ class MarketScannerScreen extends ConsumerWidget {
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: signal.type == SignalType.buy 
+                    color: signal.side == OrderSide.buy 
                         ? Colors.green.withOpacity(0.2)
                         : Colors.red.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
-                    signal.type.name.toUpperCase(),
+                    signal.side.name.toUpperCase(),
                     style: TextStyle(
-                      color: signal.type == SignalType.buy ? Colors.green : Colors.red,
+                      color: signal.side == OrderSide.buy ? Colors.green : Colors.red,
                       fontWeight: FontWeight.bold,
                       fontSize: 12,
                     ),
@@ -244,10 +244,10 @@ class MarketScannerScreen extends ConsumerWidget {
               DataCell(
                 Chip(
                   label: Text(
-                    signal.source,
+                    signal.agent,
                     style: TextStyle(fontSize: 10),
                   ),
-                  backgroundColor: _getAgentColor(signal.source),
+                  backgroundColor: _getAgentColor(signal.agent),
                 ),
               ),
               DataCell(
@@ -260,7 +260,7 @@ class MarketScannerScreen extends ConsumerWidget {
                 Container(
                   constraints: BoxConstraints(maxWidth: 200),
                   child: Text(
-                    signal.metadata['reason']?.toString() ?? 'No reason',
+                    signal.reason,
                     style: TextStyle(fontSize: 12),
                     overflow: TextOverflow.ellipsis,
                   ),

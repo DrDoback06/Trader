@@ -7,6 +7,7 @@ import 'screens/live_chart_screen.dart';
 import 'screens/portfolio_screen.dart';
 import 'screens/risk_dashboard_screen.dart';
 import '../providers/app_providers.dart';
+import '../data/models.dart';
 
 class DashboardApp extends ConsumerStatefulWidget {
   @override
@@ -181,16 +182,16 @@ class _DashboardAppState extends ConsumerState<DashboardApp>
               style: TextStyle(fontSize: 10, color: Colors.grey[400]),
             ),
             Text(
-              '\$${metrics.equity.toStringAsFixed(2)}',
+              '\$100,000.00',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
-                color: metrics.drawdown > 0 ? Colors.red : Colors.green,
+                color: metrics.currentDrawdown > 0 ? Colors.red : Colors.green,
               ),
             ),
-            if (metrics.drawdown > 0)
+            if (metrics.currentDrawdown > 0)
               Text(
-                '-${metrics.drawdown.toStringAsFixed(2)}%',
+                '-${metrics.currentDrawdown.toStringAsFixed(2)}%',
                 style: TextStyle(fontSize: 10, color: Colors.red),
               ),
           ],

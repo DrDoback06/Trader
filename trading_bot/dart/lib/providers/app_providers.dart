@@ -77,16 +77,15 @@ final riskMetricsProvider = StreamProvider<RiskMetrics>((ref) {
       // In a real implementation, this would call a REST endpoint
       // For now, return mock data
       return RiskMetrics(
-        equity: 100000.0,
-        drawdown: 0.5,
-        maxDrawdown: 1.2,
-        circuitBreakerActive: false,
-        openPositions: 3,
-        maxPositions: 10,
         portfolioHeat: 8.5,
-        maxPortfolioHeat: 15.0,
-        valueAtRisk95: 2500.0,
+        currentDrawdown: 0.5,
+        maxDrawdown: 1.2,
+        var95: 2500.0,
         portfolioBeta: 1.1,
+        openPositions: 3,
+        leverageRatio: 1.5,
+        riskScore: 75.0,
+        circuitBreakerActive: false,
       );
     } catch (e) {
       throw Exception('Failed to fetch risk metrics: $e');
@@ -290,6 +289,7 @@ RiskMetrics _generateRandomRiskMetrics() {
     openPositions: Random().nextInt(8) + 1,
     leverageRatio: 1.0 + Random().nextDouble() * 2.0,
     riskScore: Random().nextDouble() * 100,
+    circuitBreakerActive: Random().nextBool(),
   );
 }
 

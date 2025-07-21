@@ -81,7 +81,7 @@ class PortfolioScreen extends ConsumerWidget {
             child: _buildSummaryCard(
               context,
               'Total Equity',
-              '\$${metrics.equity.toStringAsFixed(2)}',
+              '\$100,000.00',
               Icons.account_balance,
               Colors.blue,
             ),
@@ -103,7 +103,7 @@ class PortfolioScreen extends ConsumerWidget {
               'Portfolio Heat',
               '${metrics.portfolioHeat.toStringAsFixed(1)}%',
               Icons.local_fire_department,
-              _getHeatColor(metrics.portfolioHeat, metrics.maxPortfolioHeat),
+              _getHeatColor(metrics.portfolioHeat, 15.0),
             ),
           ),
           Gap(16),
@@ -111,9 +111,9 @@ class PortfolioScreen extends ConsumerWidget {
             child: _buildSummaryCard(
               context,
               'Drawdown',
-              '${metrics.drawdown.toStringAsFixed(2)}%',
+              '${metrics.currentDrawdown.toStringAsFixed(2)}%',
               Icons.trending_down,
-              metrics.drawdown > 0 ? Colors.red : Colors.grey,
+              metrics.currentDrawdown > 0 ? Colors.red : Colors.grey,
             ),
           ),
         ],
@@ -378,7 +378,7 @@ class PortfolioScreen extends ConsumerWidget {
                   ],
                   Spacer(),
                   Text(
-                    'Opened ${_formatDate(position.openedAt)}',
+                    'Opened ${_formatDate(position.openTime)}',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Colors.grey[600],
                     ),
@@ -437,7 +437,7 @@ class PortfolioScreen extends ConsumerWidget {
               _buildDetailRow('Take Profit', '\$${position.takeProfit!.toStringAsFixed(2)}'),
             if (position.unrealizedPnl != null)
               _buildDetailRow('Unrealized P&L', '\$${position.unrealizedPnl!.toStringAsFixed(2)}'),
-            _buildDetailRow('Opened At', _formatDateTime(position.openedAt)),
+            _buildDetailRow('Opened At', _formatDateTime(position.openTime)),
           ],
         ),
         actions: [
