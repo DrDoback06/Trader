@@ -131,7 +131,7 @@ class MarketScannerScreen extends ConsumerWidget {
         Spacer(),
         Text(
           'Live updates every 300ms',
-          style: Theme.of(context).textTheme.caption?.copyWith(
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
             color: Colors.green,
           ),
         ),
@@ -150,7 +150,7 @@ class MarketScannerScreen extends ConsumerWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.signals_cellular_alt, size: 48, color: Colors.grey),
+            Icon(Icons.signal_cellular_alt, size: 48, color: Colors.grey),
             Gap(16),
             Text(
               'No signals detected',

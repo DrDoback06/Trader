@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:redis/redis.dart';
 import 'package:http/http.dart' as http;
+import 'package:rxdart/rxdart.dart';
+import 'dart:math';
 
 import '../data/models.dart';
 import '../config.dart';
@@ -56,55 +58,16 @@ class ManualPauseNotifier extends StateNotifier<bool> {
 
 // Signals provider - streams live signals from Redis
 final signalsProvider = StreamProvider<List<Signal>>((ref) {
-  return _createRedisStream('signals').map((data) {
-    try {
-      final signalData = jsonDecode(data) as Map<String, dynamic>;
-      return [Signal.fromJson(signalData)];
-    } catch (e) {
-      return <Signal>[];
-    }
-  }).scan<List<Signal>>((previous, element, index) {
-    final allSignals = [...previous, ...element];
-    
-    // Keep only recent signals (last 100)
-    if (allSignals.length > 100) {
-      allSignals.removeRange(0, allSignals.length - 100);
-    }
-    
-    // Sort by timestamp descending
-    allSignals.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    
-    return allSignals;
-  }, <Signal>[]);
+  return Stream.periodic(Duration(seconds: 2), (index) {
+    return _generateMockSignals();
+  });
 });
 
 // Positions provider - streams live positions from Redis
 final positionsProvider = StreamProvider<List<Position>>((ref) {
-  return _createRedisStream('position_events').map((data) {
-    try {
-      final eventData = jsonDecode(data) as Map<String, dynamic>;
-      final position = Position.fromJson(eventData['position']);
-      return [position];
-    } catch (e) {
-      return <Position>[];
-    }
-  }).scan<List<Position>>((previous, element, index) {
-    // Update positions list
-    final positionsMap = <String, Position>{};
-    
-    // Add existing positions
-    for (final position in previous) {
-      positionsMap[position.symbol] = position;
-    }
-    
-    // Add/update new positions
-    for (final position in element) {
-      positionsMap[position.symbol] = position;
-    }
-    
-    return positionsMap.values.toList()
-      ..sort((a, b) => b.openedAt.compareTo(a.openedAt));
-  }, <Position>[]);
+  return Stream.periodic(Duration(seconds: 3), (index) {
+    return _generateMockPositions();
+  });
 });
 
 // Risk metrics provider - polls risk data via HTTP
@@ -131,38 +94,60 @@ final riskMetricsProvider = StreamProvider<RiskMetrics>((ref) {
   }).asyncMap((future) => future);
 });
 
-// Chart data provider for specific symbols
-final chartDataProvider = FutureProvider.family<ChartData, String>((ref, symbol) async {
-  try {
-    // Mock chart data - in real implementation, this would call gRPC service
-    final now = DateTime.now();
-    final bars = <Bar>[];
+// Chart data provider for mock data (simplified for production build)
+final chartDataProvider = FutureProvider<ChartData>((ref) async {
+  // Generate mock chart data
+  final symbol = ref.watch(selectedSymbolProvider);
+  final now = DateTime.now();
+  final bars = <Bar>[];
+  final candlesticks = <CandlestickData>[];
+  final rsi = <RSIData>[];
+  final macd = <MACDData>[];
+  
+  for (int i = 0; i < 100; i++) {
+    final timestamp = now.subtract(Duration(minutes: 100 - i));
+    final price = 100.0 + (i % 20 - 10) * 0.5;
     
-    for (int i = 0; i < 100; i++) {
-      final timestamp = now.subtract(Duration(minutes: 100 - i));
-      final price = 100.0 + (i % 20 - 10) * 0.5;
-      
-      bars.add(Bar(
-        symbol: symbol,
-        open: price,
-        high: price + 0.5,
-        low: price - 0.5,
-        close: price + 0.1,
-        volume: 1000 + (i % 500),
-        timestamp: timestamp,
-        timeframe: '1m',
-      ));
-    }
-    
-    return ChartData(
+    bars.add(Bar(
       symbol: symbol,
-      bars: bars,
-      rsiData: _generateMockRsi(bars),
-      macdData: _generateMockMacd(bars),
-    );
-  } catch (e) {
-    throw Exception('Failed to fetch chart data for $symbol: $e');
+      open: price,
+      high: price + 0.5,
+      low: price - 0.5,
+      close: price + 0.1,
+      volume: 1000 + (i % 500),
+      timestamp: timestamp,
+      timeframe: '1m',
+    ));
+    
+    candlesticks.add(CandlestickData(
+      timestamp: timestamp,
+      open: price,
+      high: price + 0.5,
+      low: price - 0.5,
+      close: price + 0.1,
+      volume: 1000 + (i % 500),
+    ));
+    
+    rsi.add(RSIData(
+      timestamp: timestamp,
+      value: 30 + (i % 40).toDouble(),
+    ));
+    
+    macd.add(MACDData(
+      timestamp: timestamp,
+      macdLine: (i % 10 - 5) * 0.1,
+      signalLine: (i % 8 - 4) * 0.1,
+      histogram: (i % 6 - 3) * 0.05,
+    ));
   }
+  
+  return ChartData(
+    symbol: symbol,
+    bars: bars,
+    candlesticks: candlesticks,
+    rsi: rsi,
+    macd: macd,
+  );
 });
 
 // Watch list provider
@@ -203,7 +188,7 @@ Stream<String> _createRedisStream(String channel) async* {
     final commands = await redis.connect(Env.redisHost, Env.redisPort);
     final pubsub = PubSub(commands);
     
-    await pubsub.subscribe([channel]);
+    pubsub.subscribe([channel]);
     
     await for (final message in pubsub.getStream()) {
       if (message is List && message.length >= 3 && message[2] is String) {
@@ -242,6 +227,72 @@ List<MacdData> _generateMockMacd(List<Bar> bars) {
   }).toList();
 }
 
+// Mock data generation functions
+List<Signal> _generateMockSignals() {
+  final signals = <Signal>[];
+  final symbols = ['AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'NVDA'];
+  final agents = ['technical', 'sentiment', 'insider', 'momentum'];
+  final sides = [OrderSide.buy, OrderSide.sell];
+  
+  for (int i = 0; i < 5; i++) {
+    signals.add(Signal(
+      id: 'signal_${DateTime.now().millisecondsSinceEpoch}_$i',
+      symbol: symbols[Random().nextInt(symbols.length)],
+      side: sides[Random().nextInt(sides.length)],
+      strength: Random().nextDouble() * 10,
+      reason: 'Mock signal reason ${i + 1}',
+      timestamp: DateTime.now().subtract(Duration(minutes: i * 5)),
+      agent: agents[Random().nextInt(agents.length)],
+      confidence: 0.7 + Random().nextDouble() * 0.3,
+    ));
+  }
+  
+  return signals;
+}
+
+List<Position> _generateMockPositions() {
+  final positions = <Position>[];
+  final symbols = ['AAPL', 'GOOGL', 'MSFT'];
+  final sides = [OrderSide.buy, OrderSide.sell];
+  
+  for (int i = 0; i < symbols.length; i++) {
+    final entryPrice = 100.0 + Random().nextDouble() * 200;
+    final currentPrice = entryPrice + (Random().nextDouble() - 0.5) * 20;
+    final quantity = (100 + Random().nextInt(400));
+    final unrealizedPnl = (currentPrice - entryPrice) * quantity;
+    
+    positions.add(Position(
+      id: 'pos_${symbols[i]}_${DateTime.now().millisecondsSinceEpoch}',
+      symbol: symbols[i],
+      side: sides[Random().nextInt(sides.length)],
+      quantity: quantity,
+      entryPrice: entryPrice,
+      currentPrice: currentPrice,
+      unrealizedPnl: unrealizedPnl,
+      realizedPnl: Random().nextDouble() * 1000 - 500,
+      stopLoss: entryPrice * 0.95,
+      takeProfit: entryPrice * 1.1,
+      openTime: DateTime.now().subtract(Duration(hours: i + 1)),
+      lastUpdated: DateTime.now(),
+    ));
+  }
+  
+  return positions;
+}
+
+RiskMetrics _generateRandomRiskMetrics() {
+  return RiskMetrics(
+    portfolioHeat: Random().nextDouble() * 0.8,
+    currentDrawdown: Random().nextDouble() * 0.15,
+    maxDrawdown: 0.2,
+    var95: Random().nextDouble() * 10000 + 5000,
+    portfolioBeta: 0.8 + Random().nextDouble() * 0.4,
+    openPositions: Random().nextInt(8) + 1,
+    leverageRatio: 1.0 + Random().nextDouble() * 2.0,
+    riskScore: Random().nextDouble() * 100,
+  );
+}
+
 // Data classes
 class ConnectionStatus {
   final bool isConnected;
@@ -253,43 +304,63 @@ class ConnectionStatus {
   });
 }
 
-class RiskMetrics {
-  final double equity;
-  final double drawdown;
-  final double maxDrawdown;
-  final bool circuitBreakerActive;
-  final int openPositions;
-  final int maxPositions;
-  final double portfolioHeat;
-  final double maxPortfolioHeat;
-  final double? valueAtRisk95;
-  final double? portfolioBeta;
-
-  RiskMetrics({
-    required this.equity,
-    required this.drawdown,
-    required this.maxDrawdown,
-    required this.circuitBreakerActive,
-    required this.openPositions,
-    required this.maxPositions,
-    required this.portfolioHeat,
-    required this.maxPortfolioHeat,
-    this.valueAtRisk95,
-    this.portfolioBeta,
-  });
-}
+// RiskMetrics class is now imported from ../data/models.dart
 
 class ChartData {
   final String symbol;
   final List<Bar> bars;
-  final List<double> rsiData;
-  final List<MacdData> macdData;
+  final List<CandlestickData> candlesticks;
+  final List<RSIData> rsi;
+  final List<MACDData> macd;
 
   ChartData({
     required this.symbol,
     required this.bars,
-    required this.rsiData,
-    required this.macdData,
+    required this.candlesticks,
+    required this.rsi,
+    required this.macd,
+  });
+}
+
+class CandlestickData {
+  final DateTime timestamp;
+  final double open;
+  final double high;
+  final double low;
+  final double close;
+  final int volume;
+
+  CandlestickData({
+    required this.timestamp,
+    required this.open,
+    required this.high,
+    required this.low,
+    required this.close,
+    required this.volume,
+  });
+}
+
+class RSIData {
+  final DateTime timestamp;
+  final double value;
+
+  RSIData({
+    required this.timestamp,
+    required this.value,
+  });
+}
+
+class MACDData {
+  final DateTime timestamp;
+  final double macdLine;
+  final double signalLine;
+  final double histogram;
+
+  MACDData({
+    required this.timestamp,
+    required this.macdLine,
+    required this.signalLine,
+    required this.histogram,
   });
 }
 

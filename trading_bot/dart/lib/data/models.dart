@@ -286,38 +286,42 @@ enum OrderStatus {
 
 @JsonSerializable()
 class Position {
+  final String id;
   final String symbol;
-  final double quantity;
-  final double avgPrice;
-  final double currentPrice;
-  final double unrealizedPnl;
+  final OrderSide side;
+  final int quantity;
+  final double entryPrice;
+  final double? currentPrice;
+  final double? unrealizedPnl;
   final double realizedPnl;
-  final DateTime openedAt;
   final double? stopLoss;
   final double? takeProfit;
-  final double? trailingStop;
+  final DateTime openTime;
+  final DateTime? lastUpdated;
 
   const Position({
+    required this.id,
     required this.symbol,
+    required this.side,
     required this.quantity,
-    required this.avgPrice,
-    required this.currentPrice,
-    required this.unrealizedPnl,
+    required this.entryPrice,
+    this.currentPrice,
+    this.unrealizedPnl,
     required this.realizedPnl,
-    required this.openedAt,
     this.stopLoss,
     this.takeProfit,
-    this.trailingStop,
+    required this.openTime,
+    this.lastUpdated,
   });
 
   factory Position.fromJson(Map<String, dynamic> json) => 
       _$PositionFromJson(json);
   Map<String, dynamic> toJson() => _$PositionToJson(this);
   
-  double get marketValue => quantity * currentPrice;
-  double get pnlPercent => unrealizedPnl / (quantity * avgPrice);
-  bool get isLong => quantity > 0;
-  bool get isShort => quantity < 0;
+  double get marketValue => quantity * (currentPrice ?? entryPrice);
+  double get pnlPercent => (unrealizedPnl ?? 0.0) / (quantity * entryPrice);
+  bool get isLong => side == OrderSide.buy;
+  bool get isShort => side == OrderSide.sell;
 }
 
 // News & Sentiment Models
@@ -428,22 +432,24 @@ class Portfolio {
 
 @JsonSerializable()
 class RiskMetrics {
-  final double portfolioVaR; // Value at Risk
-  final double sharpeRatio;
+  final double portfolioHeat;
+  final double currentDrawdown;
   final double maxDrawdown;
-  final double beta;
-  final double volatility;
-  final Map<String, double> sectorExposure;
-  final DateTime calculatedAt;
+  final double var95;
+  final double portfolioBeta;
+  final int openPositions;
+  final double leverageRatio;
+  final double riskScore;
 
   const RiskMetrics({
-    required this.portfolioVaR,
-    required this.sharpeRatio,
+    required this.portfolioHeat,
+    required this.currentDrawdown,
     required this.maxDrawdown,
-    required this.beta,
-    required this.volatility,
-    required this.sectorExposure,
-    required this.calculatedAt,
+    required this.var95,
+    required this.portfolioBeta,
+    required this.openPositions,
+    required this.leverageRatio,
+    required this.riskScore,
   });
 
   factory RiskMetrics.fromJson(Map<String, dynamic> json) => 

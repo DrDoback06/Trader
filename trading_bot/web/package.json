@@ -1,0 +1,25 @@
+{
+  "name": "trading-bot-web-proxy",
+  "version": "1.0.0",
+  "description": "CORS proxy server for Trading Bot Flutter web app",
+  "main": "cors_proxy.js",
+  "scripts": {
+    "start": "node cors_proxy.js",
+    "dev": "nodemon cors_proxy.js",
+    "build-flutter": "cd ../dart && flutter build web --release",
+    "deploy": "npm run build-flutter && npm start"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "http-proxy-middleware": "^2.0.6",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "author": "Trading Bot Team",
+  "license": "MIT"
+}

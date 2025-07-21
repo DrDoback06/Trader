@@ -14,10 +14,11 @@ dependencies:
   flutter_riverpod: ^2.4.9
   riverpod_annotation: ^2.3.3
   
-  # Charts and UI
-  syncfusion_flutter_charts: ^24.1.41
-  syncfusion_flutter_core: ^24.1.41
-  syncfusion_flutter_datagrid: ^24.1.41
+  # Charts and UI - temporarily replaced for production compatibility
+  # syncfusion_flutter_charts: ^24.1.41
+  # syncfusion_flutter_core: ^24.1.41
+  # syncfusion_flutter_datagrid: ^24.1.41
+  fl_chart: ^0.62.0
   
   # Existing dependencies
   web_socket_channel: ^2.4.0
@@ -32,16 +33,13 @@ dependencies:
   envied: ^0.5.3
   logger: ^2.0.2+1
   json_annotation: ^4.8.1
-  ml_linalg: ^13.16.1
+  ml_linalg: ^13.12.6
   collection: ^1.18.0
   
   # Additional UI packages
   flutter_animate: ^4.3.0
   gap: ^3.0.1
   google_fonts: ^6.1.0
-  
-  # WebSocket client for dashboard
-  web_socket_channel: ^2.4.0
 
 dev_dependencies:
   flutter_test:
@@ -49,8 +47,7 @@ dev_dependencies:
   flutter_lints: ^3.0.0
   build_runner: ^2.4.7
   json_serializable: ^6.7.1
-  riverpod_generator: ^2.3.9
-  riverpod_lint: ^2.3.7
+
 
 flutter:
   uses-material-design: true

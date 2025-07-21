@@ -1,49 +1,67 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:gap/gap.dart';
-import 'package:syncfusion_flutter_charts/charts.dart';
 
 import '../../providers/app_providers.dart';
 import '../../data/models.dart';
 
-class LiveChartScreen extends ConsumerWidget {
+class LiveChartScreen extends ConsumerStatefulWidget {
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final selectedSymbol = ref.watch(selectedSymbolProvider);
-    final chartDataAsync = ref.watch(chartDataProvider(selectedSymbol));
+  ConsumerState<LiveChartScreen> createState() => _LiveChartScreenState();
+}
+
+class _LiveChartScreenState extends ConsumerState<LiveChartScreen> {
+  String selectedTimeframe = '1M';
+  final List<String> timeframes = ['1M', '5M', '15M', '1H', '1D'];
+
+  @override
+  Widget build(BuildContext context) {
+    final chartData = ref.watch(chartDataProvider);
     final watchList = ref.watch(watchListProvider);
+    final selectedSymbol = ref.watch(selectedSymbolProvider);
 
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildHeader(context, ref, selectedSymbol, watchList),
-          Gap(16),
-          Expanded(
-            child: chartDataAsync.when(
-              data: (chartData) => _buildChartLayout(context, chartData),
-              loading: () => Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(),
-                    Gap(16),
-                    Text('Loading chart data for $selectedSymbol...'),
-                  ],
-                ),
+          // Header with controls
+          Row(
+            children: [
+              Text(
+                'Live Chart',
+                style: Theme.of(context).textTheme.headlineSmall,
               ),
-              error: (error, _) => Center(
+              Spacer(),
+              _buildSymbolSelector(watchList, selectedSymbol),
+              Gap(16),
+              _buildTimeframeSelector(),
+            ],
+          ),
+          Gap(24),
+          
+          // Chart container
+          Expanded(
+            child: Card(
+              child: Padding(
+                padding: EdgeInsets.all(16),
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.error, size: 48, color: Colors.red),
+                    Text(
+                      '$selectedSymbol - $selectedTimeframe',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
                     Gap(16),
-                    Text('Error loading chart: $error'),
-                    Gap(16),
-                    ElevatedButton(
-                      onPressed: () => ref.invalidate(chartDataProvider(selectedSymbol)),
-                      child: Text('Retry'),
+                    Expanded(
+                      child: chartData.when(
+                        data: (data) => _buildChart(data),
+                        loading: () => Center(child: CircularProgressIndicator()),
+                        error: (error, stack) => Center(
+                          child: Text('Chart Error: $error'),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -55,297 +73,222 @@ class LiveChartScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildHeader(
-    BuildContext context,
-    WidgetRef ref,
-    String selectedSymbol,
-    List<String> watchList,
-  ) {
-    return Row(
-      children: [
-        Icon(Icons.show_chart, size: 28),
-        Gap(12),
-        Text(
-          'Live Chart',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        Gap(16),
-        _buildSymbolSelector(context, ref, selectedSymbol, watchList),
-        Spacer(),
-        _buildTimeframeSelector(context, ref),
-      ],
-    );
-  }
-
-  Widget _buildSymbolSelector(
-    BuildContext context,
-    WidgetRef ref,
-    String selectedSymbol,
-    List<String> watchList,
-  ) {
+  Widget _buildSymbolSelector(List<String> watchList, String selectedSymbol) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 12),
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        border: Border.all(color: Theme.of(context).colorScheme.outline),
+        border: Border.all(color: Colors.grey),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: DropdownButton<String>(
-        value: selectedSymbol,
-        underline: SizedBox(),
-        items: watchList.map((symbol) => DropdownMenuItem(
-          value: symbol,
-          child: Text(
-            symbol,
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-        )).toList(),
-        onChanged: (newSymbol) {
-          if (newSymbol != null) {
-            ref.read(selectedSymbolProvider.notifier).state = newSymbol;
-          }
-        },
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: selectedSymbol,
+          isDense: true,
+          items: watchList.map((symbol) {
+            return DropdownMenuItem(
+              value: symbol,
+              child: Text(symbol),
+            );
+          }).toList(),
+          onChanged: (value) {
+            if (value != null) {
+              ref.read(selectedSymbolProvider.notifier).state = value;
+            }
+          },
+        ),
       ),
     );
   }
 
-  Widget _buildTimeframeSelector(BuildContext context, WidgetRef ref) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text('Timeframe:', style: Theme.of(context).textTheme.labelMedium),
-        Gap(8),
-        SegmentedButton<String>(
-          segments: [
-            ButtonSegment(value: '1m', label: Text('1m')),
-            ButtonSegment(value: '5m', label: Text('5m')),
-            ButtonSegment(value: '15m', label: Text('15m')),
-            ButtonSegment(value: '1h', label: Text('1h')),
-          ],
-          selected: {'1m'},
-          onSelectionChanged: (selected) {},
+  Widget _buildTimeframeSelector() {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: selectedTimeframe,
+          isDense: true,
+          items: timeframes.map((timeframe) {
+            return DropdownMenuItem(
+              value: timeframe,
+              child: Text(timeframe),
+            );
+          }).toList(),
+          onChanged: (value) {
+            if (value != null) {
+              setState(() {
+                selectedTimeframe = value;
+              });
+            }
+          },
         ),
-      ],
+      ),
     );
   }
 
-  Widget _buildChartLayout(BuildContext context, ChartData chartData) {
+  Widget _buildChart(ChartData data) {
     return Column(
       children: [
-        // Main price chart (70% of height)
+        // Price Chart
         Expanded(
-          flex: 7,
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: _buildPriceChart(chartData),
-            ),
-          ),
+          flex: 3,
+          child: _buildPriceChart(data.candlesticks),
         ),
-        Gap(8),
-        // RSI chart (15% of height)
+        Gap(16),
+        // Technical Indicators
         Expanded(
-          flex: 15,
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: _buildRsiChart(chartData),
-            ),
-          ),
-        ),
-        Gap(8),
-        // MACD chart (15% of height)
-        Expanded(
-          flex: 15,
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: _buildMacdChart(chartData),
-            ),
+          flex: 1,
+          child: Row(
+            children: [
+              Expanded(child: _buildRSIChart(data.rsi)),
+              Gap(16),
+              Expanded(child: _buildMACDChart(data.macd)),
+            ],
           ),
         ),
       ],
     );
   }
 
-  Widget _buildPriceChart(ChartData chartData) {
-    return SfCartesianChart(
-      title: ChartTitle(
-        text: '${chartData.symbol} - Candlestick Chart',
-        textStyle: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-      ),
-      primaryXAxis: DateTimeAxis(
-        majorGridLines: MajorGridLines(width: 0.5),
-        axisLabelFormatter: (AxisLabelRenderDetails details) {
-          final date = DateTime.fromMillisecondsSinceEpoch(details.value.toInt());
-          return ChartAxisLabel(
-            '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}',
-            TextStyle(fontSize: 10),
-          );
-        },
-      ),
-      primaryYAxis: NumericAxis(
-        opposedPosition: true,
-        majorGridLines: MajorGridLines(width: 0.5),
-        numberFormat: NumberFormat.currency(symbol: '\$', decimalDigits: 2),
-      ),
-      trackballBehavior: TrackballBehavior(
-        enable: true,
-        activationMode: ActivationMode.singleTap,
-        tooltipDisplayMode: TrackballDisplayMode.floatAllPoints,
-      ),
-      zoomPanBehavior: ZoomPanBehavior(
-        enablePinching: true,
-        enablePanning: true,
-        enableDoubleTapZooming: true,
-        enableSelectionZooming: true,
-      ),
-      series: <CartesianSeries>[
-        CandleSeries<Bar, DateTime>(
-          dataSource: chartData.bars,
-          xValueMapper: (Bar bar, _) => bar.timestamp,
-          lowValueMapper: (Bar bar, _) => bar.low,
-          highValueMapper: (Bar bar, _) => bar.high,
-          openValueMapper: (Bar bar, _) => bar.open,
-          closeValueMapper: (Bar bar, _) => bar.close,
-          name: 'Price',
-          bullColor: Colors.green,
-          bearColor: Colors.red,
-          enableTooltip: true,
-        ),
-        // Volume bars (secondary chart would be better, but keeping simple)
-      ],
-      annotations: _buildPriceAnnotations(chartData),
-    );
-  }
+  Widget _buildPriceChart(List<CandlestickData> candlesticks) {
+    if (candlesticks.isEmpty) {
+      return Center(child: Text('No price data available'));
+    }
 
-  Widget _buildRsiChart(ChartData chartData) {
-    return SfCartesianChart(
-      title: ChartTitle(
-        text: 'RSI (14)',
-        textStyle: TextStyle(fontSize: 12),
-      ),
-      primaryXAxis: DateTimeAxis(
-        isVisible: false,
-        majorGridLines: MajorGridLines(width: 0),
-      ),
-      primaryYAxis: NumericAxis(
-        minimum: 0,
-        maximum: 100,
-        majorGridLines: MajorGridLines(width: 0.5),
-        plotBands: [
-          PlotBand(
-            start: 70,
-            end: 100,
-            color: Colors.red.withOpacity(0.1),
-            text: 'Overbought',
+    final spots = candlesticks.asMap().entries.map((entry) {
+      return FlSpot(entry.key.toDouble(), entry.value.close);
+    }).toList();
+
+    return LineChart(
+      LineChartData(
+        gridData: FlGridData(show: true),
+        titlesData: FlTitlesData(
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(showTitles: true, reservedSize: 60),
           ),
-          PlotBand(
-            start: 0,
-            end: 30,
-            color: Colors.green.withOpacity(0.1),
-            text: 'Oversold',
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(showTitles: true, reservedSize: 30),
+          ),
+          rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        ),
+        borderData: FlBorderData(show: true),
+        lineBarsData: [
+          LineChartBarData(
+            spots: spots,
+            isCurved: false,
+            color: Colors.blue,
+            barWidth: 2,
+            dotData: FlDotData(show: false),
           ),
         ],
       ),
-      series: <CartesianSeries>[
-        LineSeries<double, int>(
-          dataSource: chartData.rsiData,
-          xValueMapper: (value, index) => index,
-          yValueMapper: (value, index) => value,
-          name: 'RSI',
-          color: Colors.purple,
-          width: 2,
+    );
+  }
+
+  Widget _buildRSIChart(List<RSIData> rsiData) {
+    if (rsiData.isEmpty) {
+      return Center(child: Text('No RSI data'));
+    }
+
+    final spots = rsiData.asMap().entries.map((entry) {
+      return FlSpot(entry.key.toDouble(), entry.value.value);
+    }).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('RSI', style: TextStyle(fontWeight: FontWeight.bold)),
+        Gap(8),
+        Expanded(
+          child: LineChart(
+            LineChartData(
+              gridData: FlGridData(show: true),
+              titlesData: FlTitlesData(
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(showTitles: true, reservedSize: 40),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              borderData: FlBorderData(show: true),
+              minY: 0,
+              maxY: 100,
+              lineBarsData: [
+                LineChartBarData(
+                  spots: spots,
+                  isCurved: true,
+                  color: Colors.purple,
+                  barWidth: 1.5,
+                  dotData: FlDotData(show: false),
+                ),
+              ],
+            ),
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildMacdChart(ChartData chartData) {
-    return SfCartesianChart(
-      title: ChartTitle(
-        text: 'MACD (12,26,9)',
-        textStyle: TextStyle(fontSize: 12),
-      ),
-      primaryXAxis: DateTimeAxis(
-        isVisible: false,
-        majorGridLines: MajorGridLines(width: 0),
-      ),
-      primaryYAxis: NumericAxis(
-        majorGridLines: MajorGridLines(width: 0.5),
-      ),
-      series: <CartesianSeries>[
-        LineSeries<MacdData, int>(
-          dataSource: chartData.macdData,
-          xValueMapper: (data, index) => index,
-          yValueMapper: (data, index) => data.macd,
-          name: 'MACD',
-          color: Colors.blue,
-          width: 2,
-        ),
-        LineSeries<MacdData, int>(
-          dataSource: chartData.macdData,
-          xValueMapper: (data, index) => index,
-          yValueMapper: (data, index) => data.signal,
-          name: 'Signal',
-          color: Colors.orange,
-          width: 2,
-        ),
-        ColumnSeries<MacdData, int>(
-          dataSource: chartData.macdData,
-          xValueMapper: (data, index) => index,
-          yValueMapper: (data, index) => data.histogram,
-          name: 'Histogram',
-          color: Colors.grey,
-          width: 0.5,
+  Widget _buildMACDChart(List<MACDData> macdData) {
+    if (macdData.isEmpty) {
+      return Center(child: Text('No MACD data'));
+    }
+
+    final macdSpots = macdData.asMap().entries.map((entry) {
+      return FlSpot(entry.key.toDouble(), entry.value.macdLine);
+    }).toList();
+
+    final signalSpots = macdData.asMap().entries.map((entry) {
+      return FlSpot(entry.key.toDouble(), entry.value.signalLine);
+    }).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('MACD', style: TextStyle(fontWeight: FontWeight.bold)),
+        Gap(8),
+        Expanded(
+          child: LineChart(
+            LineChartData(
+              gridData: FlGridData(show: true),
+              titlesData: FlTitlesData(
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(showTitles: true, reservedSize: 40),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              borderData: FlBorderData(show: true),
+              lineBarsData: [
+                LineChartBarData(
+                  spots: macdSpots,
+                  isCurved: true,
+                  color: Colors.blue,
+                  barWidth: 1.5,
+                  dotData: FlDotData(show: false),
+                ),
+                LineChartBarData(
+                  spots: signalSpots,
+                  isCurved: true,
+                  color: Colors.red,
+                  barWidth: 1.5,
+                  dotData: FlDotData(show: false),
+                ),
+              ],
+            ),
+          ),
         ),
       ],
     );
-  }
-
-  List<CartesianChartAnnotation> _buildPriceAnnotations(ChartData chartData) {
-    // Add horizontal lines for support/resistance levels
-    if (chartData.bars.isEmpty) return [];
-
-    final prices = chartData.bars.map((bar) => bar.close).toList();
-    final maxPrice = prices.reduce((a, b) => a > b ? a : b);
-    final minPrice = prices.reduce((a, b) => a < b ? a : b);
-    final avgPrice = prices.reduce((a, b) => a + b) / prices.length;
-
-    return [
-      CartesianChartAnnotation(
-        widget: Container(
-          padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-          decoration: BoxDecoration(
-            color: Colors.blue.withOpacity(0.7),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Text(
-            'Avg: \$${avgPrice.toStringAsFixed(2)}',
-            style: TextStyle(color: Colors.white, fontSize: 10),
-          ),
-        ),
-        coordinateUnit: CoordinateUnit.point,
-        x: chartData.bars.length * 0.8,
-        y: avgPrice,
-      ),
-    ];
-  }
-}
-
-// Helper class for number formatting
-class NumberFormat {
-  static NumberFormat currency({String symbol = '', int decimalDigits = 2}) {
-    return NumberFormat._internal(symbol, decimalDigits);
-  }
-
-  final String _symbol;
-  final int _decimalDigits;
-
-  NumberFormat._internal(this._symbol, this._decimalDigits);
-
-  String format(num value) {
-    return '$_symbol${value.toStringAsFixed(_decimalDigits)}';
   }
 }
