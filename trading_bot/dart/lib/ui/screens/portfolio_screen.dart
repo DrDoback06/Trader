@@ -8,38 +8,22 @@ import '../../data/models.dart';
 class PortfolioScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final positionsAsync = ref.watch(positionsProvider);
+    final manualPositions = ref.watch(portfolioProvider);
     final riskMetrics = ref.watch(riskMetricsProvider);
 
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return Scaffold(
+      body: Column(
         children: [
           _buildHeader(context),
           Gap(16),
-          _buildSummaryCards(context, riskMetrics),
+          riskMetrics.when(
+            data: (metrics) => _buildSummaryCards(context, metrics, manualPositions),
+            loading: () => _buildLoadingSummary(),
+            error: (_, __) => _buildErrorSummary(),
+          ),
           Gap(16),
           Expanded(
-            child: positionsAsync.when(
-              data: (positions) => _buildPositionsList(context, ref, positions),
-              loading: () => Center(child: CircularProgressIndicator()),
-              error: (error, _) => Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error, size: 48, color: Colors.red),
-                    Gap(16),
-                    Text('Error loading positions: $error'),
-                    Gap(16),
-                    ElevatedButton(
-                      onPressed: () => ref.invalidate(positionsProvider),
-                      child: Text('Retry'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            child: _buildPositionsList(context, manualPositions),
           ),
         ],
       ),
@@ -73,67 +57,107 @@ class PortfolioScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildSummaryCards(BuildContext context, AsyncValue<RiskMetrics> riskMetrics) {
-    return riskMetrics.when(
-      data: (metrics) => Row(
-        children: [
-          Expanded(
-            child: _buildSummaryCard(
-              context,
-              'Total Equity',
-              '\$100,000.00',
-              Icons.account_balance,
-              Colors.blue,
-            ),
-          ),
-          Gap(16),
-          Expanded(
-            child: _buildSummaryCard(
-              context,
-              'Open Positions',
-              '${metrics.openPositions}',
-              Icons.trending_up,
-              Colors.green,
-            ),
-          ),
-          Gap(16),
-          Expanded(
-            child: _buildSummaryCard(
-              context,
-              'Portfolio Heat',
-              '${metrics.portfolioHeat.toStringAsFixed(1)}%',
-              Icons.local_fire_department,
-              _getHeatColor(metrics.portfolioHeat, 15.0),
-            ),
-          ),
-          Gap(16),
-          Expanded(
-            child: _buildSummaryCard(
-              context,
-              'Drawdown',
-              '${metrics.currentDrawdown.toStringAsFixed(2)}%',
-              Icons.trending_down,
-              metrics.currentDrawdown > 0 ? Colors.red : Colors.grey,
-            ),
-          ),
-        ],
-      ),
-      loading: () => Row(
-        children: List.generate(4, (index) => 
-          Expanded(
-            child: Container(
-              margin: EdgeInsets.only(right: index < 3 ? 16 : 0),
-              child: Card(
-                child: Container(
-                  height: 100,
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-              ),
-            ),
+  Widget _buildSummaryCards(BuildContext context, RiskMetrics metrics, List<ManualPosition> positions) {
+    final totalValue = positions.fold<double>(0, (sum, pos) => sum + (pos.currentPrice * pos.quantity));
+    final totalPnL = positions.fold<double>(0, (sum, pos) => sum + pos.unrealizedPnl);
+    final totalInvested = positions.fold<double>(0, (sum, pos) => sum + (pos.entryPrice * pos.quantity));
+    final totalPnLPercentage = totalInvested > 0 ? (totalPnL / totalInvested) * 100 : 0.0;
+    
+    return Row(
+      children: [
+        Expanded(
+          child: _buildSummaryCard(
+            context,
+            'Total Value',
+            '\$${totalValue.toStringAsFixed(2)}',
+            Icons.account_balance,
+            Colors.blue,
           ),
         ),
+        Gap(16),
+        Expanded(
+          child: _buildSummaryCard(
+            context,
+            'Total P&L',
+            '${totalPnL >= 0 ? '+' : ''}\$${totalPnL.toStringAsFixed(2)}',
+            Icons.trending_up,
+            totalPnL >= 0 ? Colors.green : Colors.red,
+          ),
+        ),
+        Gap(16),
+        Expanded(
+          child: _buildSummaryCard(
+            context,
+            'P&L %',
+            '${totalPnLPercentage >= 0 ? '+' : ''}${totalPnLPercentage.toStringAsFixed(2)}%',
+            Icons.percent,
+            totalPnLPercentage >= 0 ? Colors.green : Colors.red,
+          ),
+        ),
+        Gap(16),
+        Expanded(
+          child: _buildSummaryCard(
+            context,
+            'Open Positions',
+            '${positions.where((p) => p.isActive).length}',
+            Icons.inventory,
+            Colors.orange,
+          ),
+        ),
+        Gap(16),
+        Expanded(
+          child: _buildSummaryCard(
+            context,
+            'Portfolio Heat',
+            '${metrics.portfolioHeat.toStringAsFixed(1)}%',
+            Icons.local_fire_department,
+            _getHeatColor(metrics.portfolioHeat, 15.0),
+          ),
+        ),
+        Gap(16),
+        Expanded(
+          child: _buildSummaryCard(
+            context,
+            'Drawdown',
+            '${metrics.currentDrawdown.toStringAsFixed(2)}%',
+            Icons.trending_down,
+            metrics.currentDrawdown > 0 ? Colors.red : Colors.grey,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLoadingSummary() {
+    return Row(
+      children: List.generate(6, (index) => Expanded(
+        child: Container(
+          margin: EdgeInsets.only(right: index < 5 ? 16 : 0),
+          height: 100,
+          decoration: BoxDecoration(
+            color: Colors.grey.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      )),
+    );
+  }
+
+  Widget _buildErrorSummary() {
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.red.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
       ),
-      error: (_, __) => Container(),
+      child: Row(
+        children: [
+          Icon(Icons.error, color: Colors.red),
+          Gap(12),
+          Text('Error loading portfolio metrics'),
+        ],
+      ),
     );
   }
 
@@ -144,71 +168,126 @@ class PortfolioScreen extends ConsumerWidget {
     IconData icon,
     Color color,
   ) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(icon, color: color, size: 20),
-                Gap(8),
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.grey[600],
-                  ),
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 24),
+              Spacer(),
+              Container(
+                padding: EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.2),
+                  shape: BoxShape.circle,
                 ),
-              ],
-            ),
-            Gap(8),
-            Text(
-              value,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: color,
+                child: Icon(Icons.arrow_upward, size: 12, color: color),
               ),
+            ],
+          ),
+          Gap(12),
+          Text(
+            title,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Colors.grey[600],
             ),
-          ],
-        ),
+          ),
+          Gap(4),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Color _getHeatColor(double current, double max) {
-    final ratio = current / max;
-    if (ratio > 0.8) return Colors.red;
-    if (ratio > 0.6) return Colors.orange;
-    if (ratio > 0.4) return Colors.yellow;
-    return Colors.green;
-  }
-
-  Widget _buildPositionsList(
-    BuildContext context,
-    WidgetRef ref,
-    List<Position> positions,
-  ) {
+  Widget _buildPositionsList(BuildContext context, List<ManualPosition> positions) {
     if (positions.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.account_balance_wallet, size: 48, color: Colors.grey),
+            Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey),
             Gap(16),
             Text(
-              'No open positions',
-              style: Theme.of(context).textTheme.titleMedium,
+              'No Positions Yet',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: Colors.grey[600],
+              ),
             ),
             Gap(8),
             Text(
-              'Your portfolio is currently empty. Positions will appear here when trades are executed.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.grey,
-              ),
+              'Add positions from the Market Scanner to start tracking your trades',
               textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Colors.grey[500],
+              ),
+            ),
+            Gap(24),
+            ElevatedButton.icon(
+              onPressed: () {
+                // Navigate to market scanner
+              },
+              icon: Icon(Icons.add_shopping_cart),
+              label: Text('Browse Market Scanner'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
             ),
           ],
+        ),
+      );
+    }
+
+    final activePositions = positions.where((p) => p.isActive).toList();
+    final closedPositions = positions.where((p) => !p.isActive).toList();
+
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        children: [
+          TabBar(
+            labelColor: Theme.of(context).colorScheme.primary,
+            unselectedLabelColor: Colors.grey,
+            indicatorColor: Theme.of(context).colorScheme.primary,
+            tabs: [
+              Tab(text: 'Active (${activePositions.length})'),
+              Tab(text: 'Closed (${closedPositions.length})'),
+            ],
+          ),
+          Gap(16),
+          Expanded(
+            child: TabBarView(
+              children: [
+                _buildPositionsTab(context, activePositions, true),
+                _buildPositionsTab(context, closedPositions, false),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPositionsTab(BuildContext context, List<ManualPosition> positions, bool isActive) {
+    if (positions.isEmpty) {
+      return Center(
+        child: Text(
+          isActive ? 'No active positions' : 'No closed positions',
+          style: TextStyle(color: Colors.grey[600]),
         ),
       );
     }
@@ -217,198 +296,253 @@ class PortfolioScreen extends ConsumerWidget {
       itemCount: positions.length,
       itemBuilder: (context, index) {
         final position = positions[index];
-        return _buildPositionCard(context, ref, position);
+        return _buildPositionCard(context, position, isActive);
       },
     );
   }
 
-  Widget _buildPositionCard(
-    BuildContext context,
-    WidgetRef ref,
-    Position position,
-  ) {
-    final unrealizedPnl = position.unrealizedPnl ?? 0.0;
-    final unrealizedPnlPercent = (unrealizedPnl / (position.quantity * position.entryPrice)) * 100;
-    final isProfit = unrealizedPnl >= 0;
+  Widget _buildPositionCard(BuildContext context, ManualPosition position, bool isActive) {
+    final pnlColor = position.unrealizedPnl >= 0 ? Colors.green : Colors.red;
+    final pnlIcon = position.unrealizedPnl >= 0 ? Icons.trending_up : Icons.trending_down;
 
     return Card(
       margin: EdgeInsets.only(bottom: 12),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: EdgeInsets.all(16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Header row
             Row(
               children: [
-                // Symbol and side
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: position.side == OrderSide.buy ? Colors.green.withOpacity(0.2) : Colors.red.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    position.side.name.toUpperCase(),
+                    style: TextStyle(
+                      color: position.side == OrderSide.buy ? Colors.green : Colors.red,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                Gap(8),
+                Text(
+                  position.symbol,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Gap(8),
+                Text(
+                  '${position.quantity} shares',
+                  style: TextStyle(color: Colors.grey[600]),
+                ),
+                Spacer(),
+                if (isActive) ...[
+                  PopupMenuButton<String>(
+                    onSelected: (value) => _handlePositionAction(context, position, value),
+                    itemBuilder: (context) => [
+                      PopupMenuItem(value: 'edit', child: Text('Edit Position')),
+                      PopupMenuItem(value: 'close', child: Text('Close Position')),
+                      PopupMenuItem(value: 'details', child: Text('View Details')),
+                    ],
+                    child: Icon(Icons.more_vert),
+                  ),
+                ],
+              ],
+            ),
+            Gap(16),
+            // Price and P&L info
+            Row(
+              children: [
                 Expanded(
-                  flex: 2,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            position.symbol,
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Gap(8),
-                          Container(
-                            padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: position.side == OrderSide.buy 
-                                  ? Colors.green.withOpacity(0.2)
-                                  : Colors.red.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              position.side == OrderSide.buy ? 'LONG' : 'SHORT',
+                  child: _buildPriceInfo('Entry', position.entryPrice, Colors.blue),
+                ),
+                Expanded(
+                  child: _buildPriceInfo('Current', position.currentPrice, Colors.grey[700]!),
+                ),
+                Expanded(
+                  child: _buildPriceInfo('Stop Loss', position.stopLoss, Colors.red),
+                ),
+                Expanded(
+                  child: _buildPriceInfo('Take Profit', position.takeProfit, Colors.green),
+                ),
+              ],
+            ),
+            Gap(16),
+            // P&L and metrics
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: pnlColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: pnlColor.withOpacity(0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(pnlIcon, color: pnlColor, size: 16),
+                            Gap(4),
+                            Text(
+                              'Unrealized P&L',
                               style: TextStyle(
-                                color: position.side == OrderSide.buy ? Colors.green : Colors.red,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 10,
+                                fontSize: 12,
+                                color: Colors.grey[600],
                               ),
                             ),
+                          ],
+                        ),
+                        Gap(4),
+                        Text(
+                          '${position.unrealizedPnl >= 0 ? '+' : ''}\$${position.unrealizedPnl.toStringAsFixed(2)}',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: pnlColor,
                           ),
-                        ],
-                      ),
-                      Gap(4),
-                      Text(
-                        'Qty: ${position.quantity.toStringAsFixed(6)}',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.grey[600],
                         ),
-                      ),
-                    ],
+                        Text(
+                          '${position.pnlPercentage >= 0 ? '+' : ''}${position.pnlPercentage.toStringAsFixed(2)}%',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: pnlColor,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                // Entry price
+                Gap(12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Entry',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                      Text(
-                        '\$${position.entryPrice.toStringAsFixed(2)}',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // Current price
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Current',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                      Text(
-                        '\$${(position.currentPrice ?? position.entryPrice).toStringAsFixed(2)}',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // P&L
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        'P&L',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                      Text(
-                        '\$${unrealizedPnl.toStringAsFixed(2)}',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: isProfit ? Colors.green : Colors.red,
-                        ),
-                      ),
-                      Text(
-                        '${isProfit ? '+' : ''}${unrealizedPnlPercent.toStringAsFixed(2)}%',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: isProfit ? Colors.green : Colors.red,
-                        ),
-                      ),
+                      _buildInfoRow('Market Value', '\$${(position.currentPrice * position.quantity).toStringAsFixed(2)}'),
+                      _buildInfoRow('Cost Basis', '\$${(position.entryPrice * position.quantity).toStringAsFixed(2)}'),
+                      _buildInfoRow('Entry Time', _formatDateTime(position.entryTime)),
                     ],
                   ),
                 ),
               ],
             ),
-            if (position.stopLoss != null || position.takeProfit != null) ...[
-              Gap(12),
-              Divider(),
-              Gap(8),
+            if (isActive) ...[
+              Gap(16),
+              // Risk indicators
               Row(
                 children: [
-                  if (position.stopLoss != null) ...[
-                    Icon(Icons.stop, size: 16, color: Colors.red),
-                    Gap(4),
-                    Text(
-                      'Stop: \$${position.stopLoss!.toStringAsFixed(2)}',
-                      style: TextStyle(color: Colors.red, fontSize: 12),
-                    ),
-                  ],
-                  if (position.stopLoss != null && position.takeProfit != null)
-                    Gap(16),
-                  if (position.takeProfit != null) ...[
-                    Icon(Icons.flag, size: 16, color: Colors.green),
-                    Gap(4),
-                    Text(
-                      'Target: \$${position.takeProfit!.toStringAsFixed(2)}',
-                      style: TextStyle(color: Colors.green, fontSize: 12),
-                    ),
-                  ],
-                  Spacer(),
-                  Text(
-                    'Opened ${_formatDate(position.openTime)}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.grey[600],
-                    ),
+                  _buildRiskIndicator(
+                    'Stop Loss Risk',
+                    '${((position.entryPrice - position.stopLoss) / position.entryPrice * 100).toStringAsFixed(1)}%',
+                    Colors.red,
+                  ),
+                  Gap(12),
+                  _buildRiskIndicator(
+                    'Take Profit Target',
+                    '${((position.takeProfit - position.entryPrice) / position.entryPrice * 100).toStringAsFixed(1)}%',
+                    Colors.green,
+                  ),
+                  Gap(12),
+                  _buildRiskIndicator(
+                    'Risk/Reward',
+                    '1:${((position.takeProfit - position.entryPrice) / (position.entryPrice - position.stopLoss)).toStringAsFixed(1)}',
+                    Colors.blue,
                   ),
                 ],
               ),
             ],
-            Gap(8),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _showPositionDetails(context, position),
-                    icon: Icon(Icons.info_outline, size: 16),
-                    label: Text('Details'),
-                  ),
-                ),
-                Gap(8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _showClosePositionDialog(context, ref, position),
-                    icon: Icon(Icons.close, size: 16),
-                    label: Text('Close'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red,
-                      side: BorderSide(color: Colors.red),
-                    ),
-                  ),
-                ),
-              ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPriceInfo(String label, double price, Color color) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[600],
+          ),
+        ),
+        Gap(4),
+        Text(
+          '\$${price.toStringAsFixed(2)}',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRiskIndicator(String label, String value, Color color) {
+    return Expanded(
+      child: Container(
+        padding: EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: Column(
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                color: Colors.grey[600],
+              ),
+              textAlign: TextAlign.center,
+            ),
+            Gap(2),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -416,100 +550,190 @@ class PortfolioScreen extends ConsumerWidget {
     );
   }
 
-  void _showPositionDetails(BuildContext context, Position position) {
+  void _handlePositionAction(BuildContext context, ManualPosition position, String action) {
+    switch (action) {
+      case 'edit':
+        _showEditPositionDialog(context, position);
+        break;
+      case 'close':
+        _showClosePositionDialog(context, position);
+        break;
+      case 'details':
+        _showPositionDetails(context, position);
+        break;
+    }
+  }
+
+  void _showEditPositionDialog(BuildContext context, ManualPosition position) {
+    final stopLossController = TextEditingController(text: position.stopLoss.toStringAsFixed(2));
+    final takeProfitController = TextEditingController(text: position.takeProfit.toStringAsFixed(2));
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Position Details - ${position.symbol}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildDetailRow('Symbol', position.symbol),
-            _buildDetailRow('Side', position.side == OrderSide.buy ? 'Long' : 'Short'),
-            _buildDetailRow('Quantity', position.quantity.toStringAsFixed(6)),
-            _buildDetailRow('Entry Price', '\$${position.entryPrice.toStringAsFixed(2)}'),
-            if (position.currentPrice != null)
-              _buildDetailRow('Current Price', '\$${position.currentPrice!.toStringAsFixed(2)}'),
-            if (position.stopLoss != null)
-              _buildDetailRow('Stop Loss', '\$${position.stopLoss!.toStringAsFixed(2)}'),
-            if (position.takeProfit != null)
-              _buildDetailRow('Take Profit', '\$${position.takeProfit!.toStringAsFixed(2)}'),
-            if (position.unrealizedPnl != null)
-              _buildDetailRow('Unrealized P&L', '\$${position.unrealizedPnl!.toStringAsFixed(2)}'),
-            _buildDetailRow('Opened At', _formatDateTime(position.openTime)),
+      builder: (context) => Consumer(
+        builder: (context, ref, child) => AlertDialog(
+          title: Text('Edit ${position.symbol}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: stopLossController,
+                decoration: InputDecoration(
+                  labelText: 'Stop Loss',
+                  prefixText: '\$',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.numberWithOptions(decimal: true),
+              ),
+              Gap(16),
+              TextField(
+                controller: takeProfitController,
+                decoration: InputDecoration(
+                  labelText: 'Take Profit',
+                  prefixText: '\$',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.numberWithOptions(decimal: true),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final stopLoss = double.tryParse(stopLossController.text);
+                final takeProfit = double.tryParse(takeProfitController.text);
+                
+                if (stopLoss != null && takeProfit != null) {
+                  ref.read(portfolioProvider.notifier).updatePosition(
+                    position.id,
+                    stopLoss: stopLoss,
+                    takeProfit: takeProfit,
+                  );
+                  Navigator.of(context).pop();
+                }
+              },
+              child: Text('Update'),
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Close'),
+      ),
+    );
+  }
+
+  void _showClosePositionDialog(BuildContext context, ManualPosition position) {
+    showDialog(
+      context: context,
+      builder: (context) => Consumer(
+        builder: (context, ref, child) => AlertDialog(
+          title: Text('Close Position'),
+          content: Text('Are you sure you want to close your ${position.symbol} position?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                ref.read(portfolioProvider.notifier).closePosition(position.id);
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('${position.symbol} position closed'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: Text('Close Position'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showPositionDetails(BuildContext context, ManualPosition position) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          padding: EdgeInsets.all(24),
+          constraints: BoxConstraints(maxWidth: 500),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${position.symbol} Position Details',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Gap(24),
+              _buildDetailRow('Symbol', position.symbol),
+              _buildDetailRow('Side', position.side.name.toUpperCase()),
+              _buildDetailRow('Quantity', '${position.quantity} shares'),
+              _buildDetailRow('Entry Price', '\$${position.entryPrice.toStringAsFixed(2)}'),
+              _buildDetailRow('Current Price', '\$${position.currentPrice.toStringAsFixed(2)}'),
+              _buildDetailRow('Stop Loss', '\$${position.stopLoss.toStringAsFixed(2)}'),
+              _buildDetailRow('Take Profit', '\$${position.takeProfit.toStringAsFixed(2)}'),
+              _buildDetailRow('Market Value', '\$${(position.currentPrice * position.quantity).toStringAsFixed(2)}'),
+              _buildDetailRow('Cost Basis', '\$${(position.entryPrice * position.quantity).toStringAsFixed(2)}'),
+              _buildDetailRow('Unrealized P&L', '${position.unrealizedPnl >= 0 ? '+' : ''}\$${position.unrealizedPnl.toStringAsFixed(2)}'),
+              _buildDetailRow('P&L Percentage', '${position.pnlPercentage >= 0 ? '+' : ''}${position.pnlPercentage.toStringAsFixed(2)}%'),
+              _buildDetailRow('Entry Time', _formatDateTime(position.entryTime)),
+              Gap(24),
+              Center(
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text('Close'),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildDetailRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      padding: EdgeInsets.symmetric(vertical: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(fontWeight: FontWeight.w500)),
-          Text(value),
-        ],
-      ),
-    );
-  }
-
-  void _showClosePositionDialog(
-    BuildContext context, 
-    WidgetRef ref, 
-    Position position,
-  ) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Close Position'),
-        content: Text(
-          'Are you sure you want to close your ${position.side.name.toUpperCase()} position in ${position.symbol}?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel'),
+          Text(
+            label,
+            style: TextStyle(fontWeight: FontWeight.w500),
           ),
-          ElevatedButton(
-            onPressed: () {
-              // TODO: Implement close position logic
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Position close request sent')),
-              );
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: Text('Close Position'),
+          Text(
+            value,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: value.contains('\$') && value.contains('+') ? Colors.green :
+                     value.contains('\$') && value.contains('-') ? Colors.red :
+                     Colors.grey[700],
+            ),
           ),
         ],
       ),
     );
   }
 
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
-    
-    if (difference.inDays > 0) {
-      return '${difference.inDays}d ago';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours}h ago';
-    } else {
-      return '${difference.inMinutes}m ago';
-    }
+  Color _getHeatColor(double heat, double maxHeat) {
+    final ratio = heat / maxHeat;
+    if (ratio >= 0.8) return Colors.red;
+    if (ratio >= 0.6) return Colors.orange;
+    if (ratio >= 0.4) return Colors.yellow;
+    return Colors.green;
   }
 
-  String _formatDateTime(DateTime date) {
-    return '${date.day}/${date.month}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+  String _formatDateTime(DateTime dateTime) {
+    return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
   }
 }

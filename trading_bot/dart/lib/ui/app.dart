@@ -17,19 +17,11 @@ class DashboardApp extends ConsumerStatefulWidget {
 class _DashboardAppState extends ConsumerState<DashboardApp>
     with TickerProviderStateMixin {
   late TabController _tabController;
-  int _currentIndex = 0;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
-    _tabController.addListener(() {
-      if (_tabController.indexIsChanging) {
-        setState(() {
-          _currentIndex = _tabController.index;
-        });
-      }
-    });
   }
 
   @override
@@ -41,7 +33,8 @@ class _DashboardAppState extends ConsumerState<DashboardApp>
   @override
   Widget build(BuildContext context) {
     final connectionStatus = ref.watch(connectionStatusProvider);
-    final riskMetrics = ref.watch(riskMetricsProvider);
+    final manualPause = ref.watch(manualPauseProvider);
+    final manualPositions = ref.watch(portfolioProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -51,28 +44,31 @@ class _DashboardAppState extends ConsumerState<DashboardApp>
             Gap(8),
             Text(
               'Multi-Agent Trading Platform',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
-            Spacer(),
-            _buildConnectionStatus(connectionStatus),
-            Gap(16),
-            _buildManualPauseSwitch(),
-            Gap(16),
-            _buildEquityDisplay(riskMetrics),
           ],
         ),
+        actions: [
+          // Connection status
+          _buildConnectionStatus(connectionStatus),
+          Gap(16),
+          // Manual pause switch
+          _buildManualPauseSwitch(manualPause),
+          Gap(16),
+          // Portfolio value
+          _buildPortfolioValue(manualPositions),
+          Gap(16),
+        ],
         bottom: TabBar(
           controller: _tabController,
           tabs: [
             Tab(
-              icon: Icon(Icons.search),
+              icon: Icon(Icons.radar),
               text: 'Market Scanner',
             ),
             Tab(
-              icon: Icon(Icons.show_chart),
-              text: 'Live Chart',
+              icon: Icon(Icons.candlestick_chart),
+              text: 'Live Charts',
             ),
             Tab(
               icon: Icon(Icons.account_balance_wallet),
@@ -85,132 +81,142 @@ class _DashboardAppState extends ConsumerState<DashboardApp>
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          MarketScannerScreen(),
-          LiveChartScreen(),
-          PortfolioScreen(),
-          RiskDashboardScreen(),
-        ],
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: TabBarView(
+          controller: _tabController,
+          children: [
+            MarketScannerScreen(),
+            LiveChartScreen(),
+            PortfolioScreen(),
+            RiskDashboardScreen(),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildConnectionStatus(AsyncValue<ConnectionStatus> connectionStatus) {
-    return connectionStatus.when(
-      data: (status) => Row(
+  Widget _buildConnectionStatus(ConnectionStatus status) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: status.isConnected 
+            ? Colors.green.withOpacity(0.2) 
+            : Colors.red.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: status.isConnected ? Colors.green : Colors.red,
+          width: 1,
+        ),
+      ),
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            status.isConnected ? Icons.wifi : Icons.wifi_off,
-            color: status.isConnected ? Colors.green : Colors.red,
-            size: 16,
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: status.isConnected ? Colors.green : Colors.red,
+              shape: BoxShape.circle,
+            ),
           ),
-          Gap(4),
+          Gap(6),
           Text(
-            status.isConnected ? 'Connected' : 'Disconnected',
+            status.isConnected ? 'CONNECTED' : 'DISCONNECTED',
             style: TextStyle(
               color: status.isConnected ? Colors.green : Colors.red,
+              fontWeight: FontWeight.bold,
               fontSize: 12,
             ),
           ),
         ],
       ),
-      loading: () => Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: 12,
-            height: 12,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-          Gap(4),
-          Text('Connecting...', style: TextStyle(fontSize: 12)),
-        ],
-      ),
-      error: (_, __) => Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.error, color: Colors.red, size: 16),
-          Gap(4),
-          Text('Error', style: TextStyle(color: Colors.red, fontSize: 12)),
-        ],
-      ),
     );
   }
 
-  Widget _buildManualPauseSwitch() {
-    final isManualPause = ref.watch(manualPauseProvider);
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          'Manual Pause',
-          style: TextStyle(fontSize: 12),
+  Widget _buildManualPauseSwitch(bool isPaused) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: isPaused 
+            ? Colors.orange.withOpacity(0.2) 
+            : Colors.blue.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isPaused ? Colors.orange : Colors.blue,
+          width: 1,
         ),
-        Gap(4),
-        Switch(
-          value: isManualPause,
-          onChanged: (value) {
-            ref.read(manualPauseProvider.notifier).toggle();
-          },
-          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildEquityDisplay(AsyncValue<RiskMetrics> riskMetrics) {
-    return riskMetrics.when(
-      data: (metrics) => Container(
-        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isPaused ? Icons.pause_circle : Icons.play_circle,
+            color: isPaused ? Colors.orange : Colors.blue,
+            size: 20,
           ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              'Equity',
-              style: TextStyle(fontSize: 10, color: Colors.grey[400]),
+          Gap(4),
+          Text(
+            isPaused ? 'PAUSED' : 'ACTIVE',
+            style: TextStyle(
+              color: isPaused ? Colors.orange : Colors.blue,
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
             ),
+          ),
+          Gap(4),
+          Switch(
+            value: !isPaused,
+            onChanged: (value) {
+              ref.read(manualPauseProvider.notifier).toggle();
+            },
+            activeColor: Colors.blue,
+            inactiveThumbColor: Colors.orange,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPortfolioValue(List<ManualPosition> positions) {
+    final totalValue = positions.fold<double>(0, (sum, pos) => sum + (pos.currentPrice * pos.quantity));
+    final totalPnL = positions.fold<double>(0, (sum, pos) => sum + pos.unrealizedPnl);
+    final baseEquity = 100000.0; // Starting equity
+    final currentEquity = baseEquity + totalPnL;
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.purple.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Colors.purple,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            '\$${currentEquity.toStringAsFixed(2)}',
+            style: TextStyle(
+              color: Colors.purple,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          ),
+          if (totalPnL != 0)
             Text(
-              '\$100,000.00',
+              '${totalPnL >= 0 ? '+' : ''}\$${totalPnL.toStringAsFixed(2)}',
               style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: metrics.currentDrawdown > 0 ? Colors.red : Colors.green,
+                color: totalPnL >= 0 ? Colors.green : Colors.red,
+                fontWeight: FontWeight.w500,
+                fontSize: 10,
               ),
             ),
-            if (metrics.currentDrawdown > 0)
-              Text(
-                '-${metrics.currentDrawdown.toStringAsFixed(2)}%',
-                style: TextStyle(fontSize: 10, color: Colors.red),
-              ),
-          ],
-        ),
-      ),
-      loading: () => Container(
-        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        child: SizedBox(
-          width: 80,
-          height: 20,
-          child: LinearProgressIndicator(),
-        ),
-      ),
-      error: (_, __) => Container(
-        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        child: Text(
-          'Error',
-          style: TextStyle(color: Colors.red, fontSize: 12),
-        ),
+        ],
       ),
     );
   }
