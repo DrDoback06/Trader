@@ -115,6 +115,12 @@ class EbayBrowseSource:
             else BuyingFormat.FIXED_PRICE
         )
 
+        current_bid: Money | None = None
+        cbp = it.get("currentBidPrice") or {}
+        if cbp.get("value") is not None:
+            current_bid = Money.of(cbp["value"], cbp.get("currency", "GBP"))
+        bid_count = int(it["bidCount"]) if it.get("bidCount") is not None else None
+
         categories = it.get("categories") or []
         category_id = categories[0].get("categoryId") if categories else None
 
@@ -133,4 +139,7 @@ class EbayBrowseSource:
             url=it.get("itemWebUrl"),
             image_url=(it.get("image") or {}).get("imageUrl"),
             item_end_date=it.get("itemEndDate"),
+            accepts_best_offer="BEST_OFFER" in buying,
+            bid_count=bid_count,
+            current_bid_price=current_bid,
         )

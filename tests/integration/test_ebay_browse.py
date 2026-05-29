@@ -95,6 +95,28 @@ def test_category_sweep_with_auction_end_window() -> None:
 
 
 @respx.mock
+def test_auction_bid_and_offer_fields() -> None:
+    respx.post(OAUTH).mock(
+        return_value=httpx.Response(200, json={"access_token": "TKN", "expires_in": 7200})
+    )
+    item = {
+        **_ITEM,
+        "buyingOptions": ["AUCTION", "BEST_OFFER"],
+        "bidCount": 2,
+        "currentBidPrice": {"value": "12.50", "currency": "GBP"},
+    }
+    respx.get(f"{BROWSE}/item_summary/search").mock(
+        return_value=httpx.Response(200, json={"itemSummaries": [item]})
+    )
+    src = EbayBrowseSource(EbayOAuth("id", "sec", OAUTH), BROWSE)
+    listing = src.fetch(query="x")[0]
+    assert listing.bid_count == 2
+    assert listing.current_bid_price is not None
+    assert listing.current_bid_price.amount == Decimal("12.50")
+    assert listing.accepts_best_offer is True
+
+
+@respx.mock
 def test_token_is_cached_across_calls() -> None:
     token_route = respx.post(OAUTH).mock(
         return_value=httpx.Response(200, json={"access_token": "TKN", "expires_in": 7200})

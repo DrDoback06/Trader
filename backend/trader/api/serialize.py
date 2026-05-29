@@ -36,6 +36,10 @@ def deal_to_dict(deal: Deal) -> dict[str, Any]:
         "sell_tier": sell_tier(deal.sell_probability).value,
         "profit_tier": profit_tier(econ.roi).value if econ else "RED",
         "discount": round(discount_vs_market(econ), 4) if econ else None,
+        "annualised_roi": (
+            round(deal.annualised_roi, 4) if deal.annualised_roi is not None else None
+        ),
+        "max_bid": money_to_dict(deal.max_bid),
         "decision": ident.decision.value,
         "match_score": ident.match_score,
         "card": None
@@ -59,6 +63,9 @@ def deal_to_dict(deal: Deal) -> dict[str, Any]:
             "shipping": money_to_dict(deal.listing.shipping),
             "buying_format": deal.listing.buying_format.value,
             "item_end_date": deal.listing.item_end_date,
+            "accepts_best_offer": deal.listing.accepts_best_offer,
+            "bid_count": deal.listing.bid_count,
+            "current_bid_price": money_to_dict(deal.listing.current_bid_price),
             "url": deal.listing.url,
             "image_url": deal.listing.image_url,
         },
@@ -70,6 +77,8 @@ def deal_to_dict(deal: Deal) -> dict[str, Any]:
             "high": money_to_dict(val.high),
             "sample_size": val.sample_size,
             "spread": round(val.spread, 3),
+            "sales_per_week": val.sales_per_week,
+            "days_to_sell": val.days_to_sell,
             "provider": val.provider,
         },
         "economics": None
@@ -96,6 +105,7 @@ def ruleset_to_dict(r: RuleSet) -> dict[str, Any]:
         "min_margin": r.min_margin,
         "min_confidence": r.min_confidence,
         "min_sell_probability": r.min_sell_probability,
+        "min_annualised_roi": r.min_annualised_roi,
         "graded_policy": r.graded_policy.value,
         "language_whitelist": list(r.language_whitelist),
         "exclude_flags": list(r.exclude_flags),

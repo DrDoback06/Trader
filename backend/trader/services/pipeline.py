@@ -9,9 +9,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from ..core.confidence import ConfidenceConfig, compute_confidence
-from ..core.economics import FeeProfile, compute_economics
-from ..core.models import Deal, Decision, Game, ListingFacts
-from ..core.rating import RatingConfig
+from ..core.economics import FeeProfile, compute_economics, max_bid_for_target
+from ..core.models import BuyingFormat, Deal, Decision, Game, ListingFacts
+from ..core.rating import RatingConfig, annualised_roi
 from ..core.rating import sell_probability as compute_sell_probability
 from ..core.rules import RuleSet, evaluate
 from ..core.scoring import deal_score, rank_deals
@@ -54,10 +54,25 @@ def evaluate_listing(
         return deal
     deal.valuation = valuation
 
+    # For auctions, the price you'd pay right now is the current bid, not the BIN.
+    is_auction = listing.buying_format is BuyingFormat.AUCTION
+    effective_ask = (
+        listing.current_bid_price
+        if is_auction and listing.current_bid_price is not None
+        else listing.price
+    )
+
     deal.economics = compute_economics(
-        ask_price=listing.price,
+        ask_price=effective_ask,
         est_value=valuation.median,
         fee_profile=cfg.fee_profile,
+        inbound_postage=listing.shipping,
+    )
+    deal.max_bid = max_bid_for_target(
+        est_value=valuation.median,
+        fee_profile=cfg.fee_profile,
+        min_roi=cfg.rules.min_roi,
+        min_profit=cfg.rules.min_profit,
         inbound_postage=listing.shipping,
     )
 
@@ -73,8 +88,10 @@ def evaluate_listing(
         valuation.sample_size,
         valuation.spread,
         target_ratio=cfg.rules.default_limit_markup,
+        sales_per_week=valuation.sales_per_week,
         cfg=cfg.rating,
     )
+    deal.annualised_roi = annualised_roi(deal.economics.roi, valuation.days_to_sell)
     deal.score = deal_score(deal.economics, deal.confidence, deal.sell_probability)
 
     passed, reasons = evaluate(deal, cfg.rules)

@@ -34,6 +34,7 @@ class RatingConfig:
     amber_sell: float = 0.40
     # Sell-through model.
     full_liquidity_samples: int = 20  # sold-comp count at which liquidity saturates
+    full_liquidity_sales_per_week: float = 3.0  # sales/week at which liquidity saturates
     max_spread: float = 1.2  # price spread at which stability hits its floor
     spread_floor: float = 0.25
 
@@ -64,21 +65,33 @@ def discount_vs_market(econ: EconomicsResult) -> float:
     return float((value - econ.buy_cost.amount) / value)
 
 
+def annualised_roi(roi: float, days_to_sell: float | None) -> float | None:
+    """ROI scaled by how often the capital turns over in a year. The real money
+    metric: a 20% flip in 5 days beats a 60% flip that sits for 6 months."""
+    if days_to_sell is None or days_to_sell <= 0:
+        return None
+    return roi * (365.0 / days_to_sell)
+
+
 def sell_probability(
     sample_size: int,
     spread: float,
     *,
     target_ratio: float = 1.0,
+    sales_per_week: float | None = None,
     cfg: RatingConfig | None = None,
 ) -> float:
     """Rough probability of selling near market value, in ``[0, 1]``.
 
-    ``target_ratio`` = planned resale price / median (1.0 = list at market; below
-    1.0 sells more easily; above 1.0 less so).
+    ``sales_per_week`` (real velocity) is preferred for the liquidity estimate when
+    available, else we fall back to the sold-comp ``sample_size``. ``target_ratio``
+    = planned resale price / median (1.0 = list at market; below 1.0 sells easier).
     """
     cfg = cfg or RatingConfig()
 
-    if cfg.full_liquidity_samples > 0:
+    if sales_per_week is not None and cfg.full_liquidity_sales_per_week > 0:
+        liquidity = min(1.0, max(0.0, sales_per_week) / cfg.full_liquidity_sales_per_week)
+    elif cfg.full_liquidity_samples > 0:
         liquidity = min(1.0, max(0, sample_size) / cfg.full_liquidity_samples)
     else:
         liquidity = 1.0

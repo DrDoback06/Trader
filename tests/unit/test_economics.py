@@ -4,7 +4,7 @@ from decimal import Decimal
 
 import pytest
 
-from trader.core.economics import FeeProfile, compute_economics
+from trader.core.economics import FeeProfile, compute_economics, max_bid_for_target
 from trader.core.money import Money
 
 
@@ -51,6 +51,34 @@ def test_currency_mismatch_between_ask_and_value_raises() -> None:
             est_value=Money.of(10, "USD"),
             fee_profile=FeeProfile.default_uk(),
         )
+
+
+def test_acquisition_price_overrides_ask() -> None:
+    fp = FeeProfile.default_uk()
+    at_ask = compute_economics(ask_price=Money.gbp(50), est_value=Money.gbp(80), fee_profile=fp)
+    via_offer = compute_economics(
+        ask_price=Money.gbp(50),
+        est_value=Money.gbp(80),
+        fee_profile=fp,
+        acquisition_price=Money.gbp(30),
+    )
+    assert via_offer.buy_cost == Money.gbp("30.00")
+    assert via_offer.profit > at_ask.profit
+
+
+def test_max_bid_clears_targets_and_one_pound_more_breaks_them() -> None:
+    fp = FeeProfile.default_uk()
+    mb = max_bid_for_target(
+        est_value=Money.gbp(80), fee_profile=fp, min_roi=0.30, min_profit=Money.gbp(5)
+    )
+    at_max = compute_economics(ask_price=mb, est_value=Money.gbp(80), fee_profile=fp)
+    assert at_max.roi >= 0.30 - 1e-6
+    assert at_max.profit.amount >= Decimal("5") - Decimal("0.01")
+
+    worse = compute_economics(
+        ask_price=Money.gbp(float(mb.amount) + 1), est_value=Money.gbp(80), fee_profile=fp
+    )
+    assert worse.roi < 0.30 or worse.profit < Money.gbp(5)
 
 
 def test_fees_are_config_driven_not_hardcoded() -> None:

@@ -27,6 +27,7 @@ class RuleSetIn(BaseModel):
     min_margin: float | None = None
     min_confidence: float | None = None
     min_sell_probability: float | None = None
+    min_annualised_roi: float | None = None
 
 
 @router.get("")
@@ -51,6 +52,8 @@ def update_settings(request: Request, body: RuleSetIn) -> dict[str, Any]:
         rules.min_confidence = body.min_confidence
     if body.min_sell_probability is not None:
         rules.min_sell_probability = body.min_sell_probability
+    if body.min_annualised_roi is not None:
+        rules.min_annualised_roi = body.min_annualised_roi
 
     # Re-run the pipeline so the dashboard reflects the new guardrails immediately.
     request.app.state.deals = build_demo_deals(request.app.state.pipeline_cfg)

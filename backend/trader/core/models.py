@@ -129,6 +129,9 @@ class ListingFacts:
     url: str | None = None
     image_url: str | None = None
     item_end_date: str | None = None  # auction end time (UTC ISO8601), if any
+    accepts_best_offer: bool = False
+    bid_count: int | None = None  # auctions only
+    current_bid_price: Money | None = None  # auctions only
 
 
 @dataclass
@@ -165,6 +168,8 @@ class Valuation:
     high: Money | None = None
     sample_size: int = 0
     spread: float = 0.0  # (high - low) / median; widens => less confidence
+    sales_per_week: float | None = None  # observed sold velocity, if known
+    days_to_sell: float | None = None  # estimated days to sell at market
     currency: str = "GBP"
 
 
@@ -178,6 +183,8 @@ class Deal:
     economics: EconomicsResult | None = None
     confidence: float = 0.0
     sell_probability: float = 0.0
+    annualised_roi: float | None = None
+    max_bid: Money | None = None  # most to pay (bid/offer) and still hit targets
     score: float = 0.0
     passed_rules: bool = False
     rule_reasons: list[str] = field(default_factory=list)

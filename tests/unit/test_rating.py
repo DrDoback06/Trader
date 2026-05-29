@@ -7,6 +7,7 @@ from trader.core.money import Money
 from trader.core.rating import (
     RatingConfig,
     Tier,
+    annualised_roi,
     discount_vs_market,
     profit_tier,
     sell_probability,
@@ -56,6 +57,19 @@ def test_sell_probability_bounds_and_monotonicity() -> None:
     assert sell_probability(20, 0.1, cfg=cfg) > sell_probability(20, 1.0, cfg=cfg)
     # saturates near 1 with many comps and a tight spread
     assert sell_probability(40, 0.0, cfg=cfg) == pytest.approx(1.0)
+
+
+def test_annualised_roi() -> None:
+    assert annualised_roi(0.30, None) is None
+    assert annualised_roi(0.30, 0) is None
+    assert annualised_roi(0.30, 73.0) == pytest.approx(0.30 * 5.0, abs=1e-6)  # 365/73 = 5
+
+
+def test_sell_probability_prefers_real_velocity() -> None:
+    cfg = RatingConfig()
+    slow = sell_probability(20, 0.2, sales_per_week=0.2, cfg=cfg)
+    fast = sell_probability(20, 0.2, sales_per_week=5.0, cfg=cfg)
+    assert fast > slow
 
 
 def test_pricing_below_market_sells_more_easily() -> None:

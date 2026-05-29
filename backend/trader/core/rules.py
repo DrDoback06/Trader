@@ -33,6 +33,7 @@ class RuleSet:
     min_margin: float = 0.15
     min_confidence: float = 0.55
     min_sell_probability: float = 0.0  # off by default; raise to filter illiquid cards
+    min_annualised_roi: float = 0.0  # off by default; raise to demand fast capital turnover
     # --- eligibility ---
     graded_policy: GradedPolicy = GradedPolicy.ALLOW
     language_whitelist: tuple[str, ...] = ("English",)
@@ -93,6 +94,15 @@ def evaluate(
         reasons.append(
             f"sell-through {deal.sell_probability:.0%} below minimum "
             f"{rules.min_sell_probability:.0%}"
+        )
+    if (
+        rules.min_annualised_roi > 0
+        and deal.annualised_roi is not None
+        and deal.annualised_roi < rules.min_annualised_roi
+    ):
+        reasons.append(
+            f"annualised ROI {deal.annualised_roi:.0%} below minimum "
+            f"{rules.min_annualised_roi:.0%}"
         )
 
     return (len(reasons) == 0, reasons)
