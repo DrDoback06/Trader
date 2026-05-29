@@ -22,6 +22,7 @@ SECRET_FIELDS: tuple[str, ...] = (
     "ebay_client_secret",
     "rapidapi_key",
     "pricecharting_api_key",
+    "anthropic_api_key",
 )
 
 

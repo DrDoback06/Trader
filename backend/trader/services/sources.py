@@ -50,6 +50,18 @@ SOURCES: list[SourceInfo] = [
         default_enabled=True,
     ),
     SourceInfo(
+        id="vision",
+        name="Photo ID (Claude AI)",
+        role="Identification",
+        region="AI",
+        currency="—",
+        requires=("anthropic_api_key",),
+        signup_url="https://console.anthropic.com/",
+        accuracy="Reads the card from the listing photo when the title is too vague to match.",
+        available=True,
+        default_enabled=False,
+    ),
+    SourceInfo(
         id="cardmarket",
         name="Cardmarket (Europe)",
         role="Market value",

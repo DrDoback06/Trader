@@ -22,6 +22,7 @@ dependencies = [
 dev = ["pytest>=8", "pytest-cov>=4", "ruff>=0.3", "mypy>=1.8", "respx>=0.20", "freezegun>=1.4"]
 db = ["sqlalchemy>=2.0", "alembic>=1.13"]   # Phase 4+: persistence
 schedule = ["apscheduler>=3.10"]            # Phase 2+: scheduled scans
+vision = ["anthropic>=0.40"]                # Wave 3 #10: photo-based card ID
 
 [tool.setuptools.packages.find]
 where = ["backend"]
@@ -53,5 +54,5 @@ disallow_untyped_defs = true
 warn_return_any = true
 
 [[tool.mypy.overrides]]
-module = ["apscheduler.*"]
+module = ["apscheduler.*", "anthropic", "anthropic.*"]
 ignore_missing_imports = true

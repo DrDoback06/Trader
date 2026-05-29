@@ -5,7 +5,16 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Protocol, runtime_checkable
 
-from ..core.models import Card, Deal, ListingFacts, Valuation
+from ..core.models import Card, Deal, ListingFacts, Valuation, VisionCard
+
+
+@runtime_checkable
+class VisionIdentifier(Protocol):
+    """Reads a card off a listing photo when the title is too vague (Wave 3 #10)."""
+
+    name: str
+
+    def identify(self, image_url: str, title: str = "") -> VisionCard | None: ...
 
 
 @runtime_checkable

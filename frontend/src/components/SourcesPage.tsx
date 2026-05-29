@@ -19,6 +19,11 @@ const KEY_FIELDS: { key: string; label: string; help: string }[] = [
     label: "PriceCharting key (optional)",
     help: "https://www.pricecharting.com/api-documentation",
   },
+  {
+    key: "anthropic_api_key",
+    label: "Claude API key — photo card ID (optional)",
+    help: "https://console.anthropic.com/",
+  },
 ];
 
 export function SourcesPage() {

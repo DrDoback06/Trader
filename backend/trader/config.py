@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     valuation_ttl_hours: int = 72
     pricecharting_api_key: str = ""
 
+    # Wave 3 #10 — vision card ID (Claude API)
+    anthropic_api_key: str = ""
+    anthropic_vision_model: str = "claude-opus-4-8"
+
     # Where UI-entered keys are persisted (local, gitignored, plaintext).
     credentials_path: str = ".trader/credentials.json"
 

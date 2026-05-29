@@ -56,6 +56,7 @@ class CredentialsIn(BaseModel):
     ebay_client_secret: str | None = None
     rapidapi_key: str | None = None
     pricecharting_api_key: str | None = None
+    anthropic_api_key: str | None = None
 
 
 class EnableIn(BaseModel):

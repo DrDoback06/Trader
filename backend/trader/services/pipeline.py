@@ -26,9 +26,10 @@ from ..identify.catalogue import Catalogue
 from ..identify.matcher import MatcherConfig, identify
 from ..identify.normalize import normalize_condition
 from ..identify.parser import parse_listing
-from ..providers.base import SoldPriceProvider
+from ..providers.base import SoldPriceProvider, VisionIdentifier
 
 _FREE_HARD_FLAGS = ("PROXY", "FAKE", "LOT")
+_VISION_MIN_CONFIDENCE = 0.6
 
 
 @dataclass
@@ -43,6 +44,7 @@ class PipelineConfig:
     # Catalogue-free valuation: value unmatched listings (e.g. sealed products) by
     # their title alone. Lower-certainty, flagged UNVERIFIED — used in sealed mode.
     catalogue_free: bool = False
+    vision: VisionIdentifier | None = None  # read the card from the photo when unmatched
     game: Game = Game.POKEMON
 
 
@@ -65,6 +67,27 @@ def evaluate_listing(
     ident = identify(parsed, catalogue, bucket, game=cfg.game, cfg=cfg.matcher)
 
     deal = Deal(listing=listing, identification=ident)
+
+    # Vision fallback: read the card off the photo, then re-match the catalogue.
+    if (
+        ident.card is None
+        and cfg.vision is not None
+        and listing.image_url
+        and not any(f in _FREE_HARD_FLAGS for f in parsed.flags)
+    ):
+        seen = cfg.vision.identify(listing.image_url, listing.title)
+        if seen is not None and seen.confidence >= _VISION_MIN_CONFIDENCE:
+            vision_parsed = ParsedListing(
+                name=seen.name, number=seen.number, set_name=seen.set_name
+            )
+            vision_ident = identify(
+                vision_parsed, catalogue, bucket, game=cfg.game, cfg=cfg.matcher
+            )
+            if vision_ident.card is not None:
+                ident.card = vision_ident.card
+                ident.match_score = vision_ident.match_score
+                if "VISION" not in parsed.flags:
+                    parsed.flags.append("VISION")
 
     # Catalogue-free fallback: value an unmatched listing by its title (sealed mode).
     if (

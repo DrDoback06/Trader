@@ -14,10 +14,11 @@ from ..services.demo import load_sold_provider
 from ..services.valuation import CachingSoldPriceProvider
 from .alert_console import ConsoleAlertChannel
 from .alert_telegram import TelegramAlertChannel
-from .base import AlertChannel, SoldPriceProvider
+from .base import AlertChannel, SoldPriceProvider, VisionIdentifier
 from .ebay_browse import EbayBrowseSource
 from .ebay_oauth import EbayOAuth
 from .soldprice_rapidapi import RapidApiSoldPriceProvider
+from .vision_claude import ClaudeVisionIdentifier
 
 _SANDBOX_OAUTH = "https://api.sandbox.ebay.com/identity/v1/oauth2/token"
 _SANDBOX_BROWSE = "https://api.sandbox.ebay.com/buy/browse/v1"
@@ -69,6 +70,22 @@ def build_alert_channel(settings: Settings) -> AlertChannel:
     return ConsoleAlertChannel()
 
 
+def build_vision_provider(
+    credentials: CredentialStore, settings: Settings
+) -> VisionIdentifier | None:
+    """Claude vision identifier when enabled + keyed + the SDK is installed."""
+    if not (credentials.is_enabled("vision") and credentials.is_configured("anthropic_api_key")):
+        return None
+    try:
+        import anthropic  # noqa: F401 -- presence check for the optional [vision] extra
+    except ImportError:
+        return None
+    return ClaudeVisionIdentifier(
+        credentials.get("anthropic_api_key"), model=settings.anthropic_vision_model
+    )
+
+
 def configure_app_providers(app: Any) -> None:
     """(Re)build providers held in app.state after any credential/source change."""
     app.state.sold_provider = build_sold_provider(app.state.credentials, app.state.settings)
+    app.state.pipeline_cfg.vision = build_vision_provider(app.state.credentials, app.state.settings)

@@ -48,13 +48,23 @@ dashboard renders them. **Done.**
 
 ## Wave 1 also delivered
 - #2 annualised-ROI + sold-velocity ranking; #4 low-/no-bid auction data + max-bid solver;
-  #7 Best-Offer/auction acquisition pricing. (See git history.)
+  #7 Best-Offer/auction acquisition pricing.
 
-## Phase 5 — Portfolio / positions / ledger (limit & stop-loss) ⏳
-- `Position` from "mark bought"; `LedgerEntry`; realized/unrealized P&L; `services/portfolio.py`
-  evaluates **limit** (target resale) and **stop-loss** (floor + `max_days_held`) → reprice /
-  cut-loss suggestions; CSV export for HMRC.
-- **Verify:** P&L + trigger unit tests with `freezegun`; PortfolioPage shows holdings + actions.
+## Wave 2 — big-margin tactics ✅
+- #5 grading arbitrage (`core/economics.GradingProfile` + `compute_grading_economics`);
+  #6 misspelling/vague-title hunter (`services/typos.py`, `hidden_gems` mode);
+  #3 price-trend/hype momentum (`PriceSnapshotRow` + `services/trends.py`).
+
+## Wave 3 — depth ✅ (Phase 5 + more)
+- #9 capital allocator (`core/allocator.py`) + portfolio P&L (`PositionRow`, `services/portfolio.py`,
+  `/allocate`, `/portfolio`, Portfolio dashboard tab, "📌 Bought"/"Mark sold").
+- #8 graded + sealed scan modes (catalogue-free title valuation, flagged UNVERIFIED).
+- #10 vision card ID from photos (`providers/vision_claude.py`, Claude API, `[vision]` extra) —
+  reads the card off the image then re-matches the catalogue; opt-in via the `vision` source.
+
+## Phase 6 — Reselling automation (seam only) 🔒
+Future `SellExecutor` over eBay Sell Inventory/Trading to auto-list/reprice. The `BuyExecutor`
+stays a no-op. Position/Ledger/limit/stop-loss fields are the forward-compatible seam.
 
 ## Phase 6 — Reselling automation (seam only) 🔒
 Future `SellExecutor` over eBay Sell Inventory/Trading to auto-list/reprice. The `BuyExecutor`

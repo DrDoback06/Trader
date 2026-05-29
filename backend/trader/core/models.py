@@ -55,6 +55,17 @@ def _fmt_grade(value: float) -> str:
 
 
 @dataclass(frozen=True)
+class VisionCard:
+    """What a vision model read off a listing photo (pre-catalogue-match)."""
+
+    name: str
+    number: str | None = None
+    set_name: str | None = None
+    condition: str | None = None
+    confidence: float = 0.0
+
+
+@dataclass(frozen=True)
 class Card:
     """A catalogue entry — one printing of one card."""
 
