@@ -481,13 +481,50 @@ table.srctable {
   font-size: 13px;
 }
 
-.field select {
+.field select,
+.field input {
   background: var(--bg);
   border: 1px solid var(--line);
   color: var(--text);
   border-radius: 8px;
   padding: 7px 9px;
   font-size: 13px;
+}
+
+.field.grow {
+  flex: 1 1 280px;
+}
+
+.field.grow input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* "Check a card" panel */
+.checkcard {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin: 18px 0;
+}
+
+.checkcard h2 {
+  font-size: 18px;
+  margin: 0 0 4px;
+}
+
+.checkcard .controls {
+  margin-top: 12px;
+}
+
+.linkbtn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0;
 }
 
 .auction {

@@ -15,9 +15,11 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from ..core.models import WatchTarget
+from ..core.models import ListingFacts, WatchTarget
+from ..core.money import Money
 from ..core.rules import RuleSet
 from ..providers.factory import build_browse_source
+from ..services.pipeline import evaluate_listing
 from ..services.scanner import scan
 from ..services.trends import attach_trends, record_snapshots
 from ..services.watchlist import (
@@ -117,3 +119,52 @@ def run_scan(request: Request, body: ScanRequest | None = None) -> dict[str, Any
         "quota_exhausted": result.quota_exhausted,
         "deals": [deal_to_dict(d) for d in result.deals],
     }
+
+
+class EvaluateIn(BaseModel):
+    query: str
+    ask_price: float
+    shipping: float | None = None
+
+
+@router.post("/evaluate")
+def evaluate_card(request: Request, body: EvaluateIn) -> dict[str, Any]:
+    """Evaluate one card you supply (name + the price you'd pay) against real UK
+    sold prices. This is the live engine minus the auto-discovery that needs eBay
+    keys, so it works today with just the RapidAPI sold-price key."""
+    query = body.query.strip()
+    if len(query) < 3:
+        raise HTTPException(status_code=400, detail="Type a card name to check.")
+    if body.ask_price <= 0:
+        raise HTTPException(status_code=400, detail="Enter the price you'd pay (greater than 0).")
+
+    # catalogue_free: value any typed-in title directly, even when it isn't in the
+    # bundled catalogue (the full ~20k-card catalogue is an optional local import).
+    cfg = replace(request.app.state.pipeline_cfg, catalogue_free=True)
+    listing = ListingFacts(
+        external_id=f"check:{query.lower()}",
+        title=query,
+        price=Money.gbp(round(body.ask_price, 2)),
+        shipping=Money.gbp(round(body.shipping, 2)) if body.shipping else None,
+    )
+    try:
+        deal = evaluate_listing(
+            listing,
+            request.app.state.catalogue,
+            request.app.state.sold_provider,
+            cfg,
+        )
+    except httpx.HTTPStatusError as exc:
+        detail = f"Sold-price lookup failed ({exc.response.status_code})."
+        if exc.response.status_code in (401, 403):
+            detail = (
+                "Your RapidAPI key was rejected (401/403). Check the key and that you've "
+                "subscribed to the eBay Average Selling Price API."
+            )
+        raise HTTPException(status_code=502, detail=detail) from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=502, detail=f"Couldn't reach the sold-price service: {exc}"
+        ) from exc
+
+    return deal_to_dict(deal)

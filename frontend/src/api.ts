@@ -64,6 +64,16 @@ export function runScan(opts: ScanOptions): Promise<ScanResult> {
   return request<ScanResult>("/scan", { method: "POST", body: JSON.stringify(opts) });
 }
 
+export interface EvaluateInput {
+  query: string;
+  ask_price: number;
+  shipping?: number;
+}
+
+export function evaluateCard(input: EvaluateInput): Promise<Deal> {
+  return request<Deal>("/evaluate", { method: "POST", body: JSON.stringify(input) });
+}
+
 export function fetchAllocation(budget?: number): Promise<Allocation> {
   return request<Allocation>(`/allocate${budget != null ? `?budget=${budget}` : ""}`);
 }

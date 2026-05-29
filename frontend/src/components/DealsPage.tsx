@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { buyDeal, fetchDeals, runScan } from "../api";
+import { buyDeal, evaluateCard, fetchDeals, runScan } from "../api";
 import type { Deal } from "../types";
 import { DealsTable } from "./DealsTable";
 
@@ -12,6 +12,16 @@ export function DealsPage() {
   const [scanMsg, setScanMsg] = useState<string | null>(null);
   const [mode, setMode] = useState("everything");
   const [hours, setHours] = useState(6);
+  const [scanned, setScanned] = useState(false);
+  const [hideSamples, setHideSamples] = useState(false);
+
+  // "Check a card" — a real valuation using your live sold-price key, no eBay key needed.
+  const [checks, setChecks] = useState<Deal[]>([]);
+  const [cardQuery, setCardQuery] = useState("");
+  const [askPrice, setAskPrice] = useState("");
+  const [postage, setPostage] = useState("");
+  const [checking, setChecking] = useState(false);
+  const [checkMsg, setCheckMsg] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -36,11 +46,40 @@ export function DealsPage() {
           r.quota_exhausted ? " (daily call budget hit)" : ""
         }.`,
       );
+      setScanned(true);
       load();
     } catch (err: unknown) {
       setScanMsg(err instanceof Error ? err.message : "scan failed");
     } finally {
       setScanning(false);
+    }
+  };
+
+  const onCheck = async () => {
+    const price = Number(askPrice);
+    if (cardQuery.trim().length < 3 || !Number.isFinite(price) || price <= 0) {
+      setCheckMsg("Enter a card name and the price you'd pay.");
+      return;
+    }
+    setChecking(true);
+    setCheckMsg(null);
+    try {
+      const ship = Number(postage);
+      const result = await evaluateCard({
+        query: cardQuery.trim(),
+        ask_price: price,
+        shipping: Number.isFinite(ship) && ship > 0 ? ship : undefined,
+      });
+      setChecks((prev) => [result, ...prev.filter((d) => d.id !== result.id)]);
+      setCheckMsg(
+        result.valuation
+          ? null
+          : "No UK sold-price data found for that search. Try the exact card name + number, the way you'd type it on eBay.",
+      );
+    } catch (err: unknown) {
+      setCheckMsg(err instanceof Error ? err.message : "check failed");
+    } finally {
+      setChecking(false);
     }
   };
 
@@ -54,6 +93,7 @@ export function DealsPage() {
   };
 
   const showHours = mode === "ending_soon" || mode === "everything";
+  const showSamples = !scanned && !hideSamples;
 
   const stats = useMemo(() => {
     const passing = deals.filter((d) => d.passed_rules);
@@ -85,6 +125,66 @@ export function DealsPage() {
           <span className="label">potential profit (passing)</span>
         </div>
       </section>
+
+      <div className="checkcard">
+        <h2>Check a card</h2>
+        <p className="sub">
+          A real valuation using your live eBay-UK sold-price key — no eBay listing key needed.
+          Type a card the way you'd search eBay, plus the price you'd pay.
+        </p>
+        <div className="controls">
+          <label className="field grow">
+            Card
+            <input
+              type="text"
+              placeholder="e.g. Charizard ex 199/165   ·   Pikachu 173/165 PSA 10"
+              value={cardQuery}
+              onChange={(e) => setCardQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") onCheck();
+              }}
+            />
+          </label>
+          <label className="field">
+            You'd pay £
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={askPrice}
+              onChange={(e) => setAskPrice(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") onCheck();
+              }}
+            />
+          </label>
+          <label className="field">
+            + postage £
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={postage}
+              onChange={(e) => setPostage(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") onCheck();
+              }}
+            />
+          </label>
+          <button className="primary" onClick={onCheck} disabled={checking}>
+            {checking ? "Checking…" : "Check value"}
+          </button>
+          {checkMsg && <span className="scanmsg">{checkMsg}</span>}
+        </div>
+        {checks.length > 0 && (
+          <>
+            <DealsTable deals={checks} onBuy={onBuy} />
+            <button className="linkbtn" onClick={() => setChecks([])}>
+              Clear checks
+            </button>
+          </>
+        )}
+      </div>
 
       <div className="controls">
         <label className="toggle">
@@ -130,13 +230,29 @@ export function DealsPage() {
         {scanMsg && <span className="scanmsg">{scanMsg}</span>}
       </div>
 
+      {showSamples && (
+        <div className="note">
+          ⚠️ The table below is <strong>sample data</strong> to show the layout — not live
+          listings. Add your eBay keys and run a scan for real deals, or use{" "}
+          <strong>Check a card</strong> above right now.{" "}
+          <button className="linkbtn" onClick={() => setHideSamples(true)}>
+            Hide samples
+          </button>
+        </div>
+      )}
+
       {loading && <p className="empty">Loading…</p>}
       {error && (
         <p className="error">
           {error}. Is the backend running on <code>http://localhost:8000</code>?
         </p>
       )}
-      {!loading && !error && <DealsTable deals={deals} onBuy={onBuy} />}
+      {!loading && !error && !hideSamples && <DealsTable deals={deals} onBuy={onBuy} />}
+      {!loading && !error && hideSamples && !scanned && (
+        <p className="empty">
+          Samples hidden. Use “Check a card” above, or run a live scan once your eBay keys are in.
+        </p>
+      )}
     </>
   );
 }
