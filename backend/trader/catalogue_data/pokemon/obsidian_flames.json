@@ -1,0 +1,10 @@
+{
+  "game": "POKEMON",
+  "set_code": "OBF",
+  "set_name": "Obsidian Flames",
+  "cards": [
+    {"number": "125/197", "name": "Charizard ex", "rarity": "Double Rare", "finish": "Holo"},
+    {"number": "215/197", "name": "Charizard ex", "rarity": "Special Illustration Rare", "finish": "Holo"},
+    {"number": "105/197", "name": "Pidgeot ex", "rarity": "Double Rare", "finish": "Holo"}
+  ]
+}

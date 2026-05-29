@@ -1,0 +1,9 @@
+{
+  "POKEMON-MEW-199/165|RAW_NM": {"median": 80, "average": 81, "low": 65, "high": 95, "sample_size": 18},
+  "POKEMON-MEW-173/165|RAW_NM": {"median": 33, "average": 34, "low": 28, "high": 41, "sample_size": 22},
+  "POKEMON-MEW-173/165|GRADED_PSA_10": {"median": 75, "average": 76, "low": 60, "high": 95, "sample_size": 9},
+  "POKEMON-MEW-6/165|RAW_NM": {"median": 18, "average": 18, "low": 14, "high": 24, "sample_size": 15},
+  "POKEMON-MEW-6/165|RAW_DAMAGED": {"median": 6, "average": 6, "low": 4, "high": 9, "sample_size": 5},
+  "POKEMON-MEW-201/165|RAW_NM": {"median": 48, "average": 49, "low": 40, "high": 58, "sample_size": 14},
+  "POKEMON-BS-4/102|GRADED_PSA_10": {"median": 2200, "average": 2300, "low": 1900, "high": 2800, "sample_size": 7}
+}

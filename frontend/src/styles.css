@@ -1,0 +1,270 @@
+:root {
+  --bg: #0f1216;
+  --panel: #171c23;
+  --panel-2: #1e252e;
+  --line: #2a323d;
+  --text: #e6eaf0;
+  --muted: #8b97a7;
+  --pos: #36d399;
+  --neg: #f87272;
+  --accent: #4c8dff;
+  --ok-bg: #143a2a;
+  --ok-fg: #4ade80;
+  --no-bg: #2a2230;
+  --no-fg: #b59ad0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 28px 20px 60px;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 30px;
+  letter-spacing: -0.5px;
+}
+
+.tagline {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.demo-pill {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin: 22px 0;
+}
+
+.stat {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.figure {
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.label {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.controls {
+  margin-bottom: 12px;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+table.deals {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  font-size: 14px;
+}
+
+.deals th,
+.deals td {
+  padding: 11px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.deals th {
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.deals th.r,
+.deals td.r {
+  text-align: right;
+}
+
+.deals th.c,
+.deals td.c {
+  text-align: center;
+}
+
+.deals th.num,
+.deals td.num {
+  text-align: center;
+  color: var(--muted);
+  width: 34px;
+}
+
+.deals tbody tr.skip {
+  opacity: 0.62;
+}
+
+.deals tbody tr:hover {
+  background: var(--panel-2);
+}
+
+.cardcell .name {
+  font-weight: 600;
+}
+
+.cardcell .cardno {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.sub {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.flags {
+  margin-top: 4px;
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.flag {
+  background: #3a2530;
+  color: #f0a6c0;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.pos {
+  color: var(--pos);
+}
+
+.neg {
+  color: var(--neg);
+}
+
+.conf {
+  font-weight: 700;
+  font-size: 12px;
+  padding: 2px 7px;
+  border-radius: 6px;
+}
+
+.conf-high {
+  background: #143a2a;
+  color: var(--pos);
+}
+
+.conf-mid {
+  background: #3a3414;
+  color: #e7c454;
+}
+
+.conf-low {
+  background: #3a1e1e;
+  color: var(--neg);
+}
+
+.badge {
+  font-weight: 700;
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 6px;
+  letter-spacing: 0.5px;
+}
+
+.badge.ok {
+  background: var(--ok-bg);
+  color: var(--ok-fg);
+}
+
+.badge.no {
+  background: var(--no-bg);
+  color: var(--no-fg);
+  cursor: help;
+}
+
+a.buy {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+a.buy:hover {
+  text-decoration: underline;
+}
+
+.empty,
+.error {
+  color: var(--muted);
+  padding: 24px 0;
+}
+
+.error {
+  color: var(--neg);
+}
+
+.error code {
+  background: var(--panel-2);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.foot {
+  margin-top: 28px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}

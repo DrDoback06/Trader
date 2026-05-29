@@ -1,0 +1,10 @@
+{
+  "game": "POKEMON",
+  "set_code": "BS",
+  "set_name": "Base Set",
+  "cards": [
+    {"number": "4/102", "name": "Charizard", "rarity": "Holo Rare", "finish": "Holo", "aliases": ["Charizard Base Set"]},
+    {"number": "2/102", "name": "Blastoise", "rarity": "Holo Rare", "finish": "Holo"},
+    {"number": "15/102", "name": "Venusaur", "rarity": "Holo Rare", "finish": "Holo"}
+  ]
+}

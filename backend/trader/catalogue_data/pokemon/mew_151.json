@@ -1,0 +1,14 @@
+{
+  "game": "POKEMON",
+  "set_code": "MEW",
+  "set_name": "151",
+  "cards": [
+    {"number": "6/165", "name": "Charizard", "rarity": "Holo Rare", "finish": "Holo"},
+    {"number": "199/165", "name": "Charizard ex", "rarity": "Special Illustration Rare", "finish": "Holo"},
+    {"number": "151/165", "name": "Mew ex", "rarity": "Double Rare", "finish": "Holo"},
+    {"number": "205/165", "name": "Mew ex", "rarity": "Special Illustration Rare", "finish": "Holo"},
+    {"number": "173/165", "name": "Pikachu", "rarity": "Illustration Rare"},
+    {"number": "201/165", "name": "Blastoise ex", "rarity": "Special Illustration Rare", "finish": "Holo"},
+    {"number": "200/165", "name": "Venusaur ex", "rarity": "Special Illustration Rare", "finish": "Holo"}
+  ]
+}
