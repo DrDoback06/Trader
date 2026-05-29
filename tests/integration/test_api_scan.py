@@ -16,6 +16,13 @@ def test_scan_requires_credentials() -> None:
     assert "Active listings" in resp.json()["detail"]
 
 
+def test_scan_accepts_discovery_mode_body() -> None:
+    client = TestClient(app)
+    resp = client.post("/scan", json={"mode": "ending_soon", "ending_within_hours": 3})
+    assert resp.status_code == 400  # still needs creds, but the body parsed fine
+    assert "Active listings" in resp.json()["detail"]
+
+
 def test_watchlist_and_quota_endpoints() -> None:
     client = TestClient(app)
     watchlist = client.get("/watchlist").json()

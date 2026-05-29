@@ -18,7 +18,8 @@ def fingerprint(listing: ListingFacts) -> str:
     title = _WS.sub(" ", (listing.title or "").lower()).strip()
     seller = (listing.seller or "").lower()
     price = str(listing.price.amount)
-    return hashlib.sha1(f"{title}|{seller}|{price}".encode()).hexdigest()
+    fmt = listing.buying_format.value
+    return hashlib.sha1(f"{title}|{seller}|{price}|{fmt}".encode()).hexdigest()
 
 
 class Dedup:

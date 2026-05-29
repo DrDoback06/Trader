@@ -14,8 +14,15 @@ dashboard renders them. **Done.**
   `WatchTarget` list; `services/dedup.py` (id + title/seller/price fingerprint).
 - ✅ `POST /scan`, `GET /watchlist`, `GET /quota`; `respx` integration tests (request shape,
   token caching, dedup, quota stop) + sandbox base-URL switch via `EBAY_ENV`.
+- ✅ **Discovery / "scour" mode:** `ScanMode` (WATCH / CHEAPEST / ENDING_SOON) lets a target sweep
+  a whole category (no keyword) for cheapest BIN/Best-Offer (`sort=price`) or auctions ending
+  within a window (`itemEndDate` filter + `sort=endingSoonest`). `POST /scan` takes
+  `{mode, ending_within_hours}`; the UI exposes mode + a 1/2/3/6/12h dropdown.
 - ⏳ **Deferred to Phase 4:** persisting `Listing` / `ScanJob` (SQLAlchemy + Alembic) and a
   scheduled (APScheduler) recurring scan — currently a single on-demand in-memory scan.
+- ⏳ **Catalogue coverage:** discovery only recognises cards in the catalogue (seed = a few sets).
+  A bigger catalogue (e.g. import from pokemontcg.io behind the `Catalogue` interface) is the next
+  unlock so a broad sweep recognises most cards.
 - **To go live:** set `EBAY_CLIENT_ID/SECRET` (+ `EBAY_ENV`) and GB trading-card category ids.
 
 ## Phase 3 — Live sold-price valuation ✅

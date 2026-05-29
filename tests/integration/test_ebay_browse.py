@@ -61,6 +61,40 @@ def test_fetch_builds_uk_request_and_parses() -> None:
 
 
 @respx.mock
+def test_category_sweep_with_auction_end_window() -> None:
+    respx.post(OAUTH).mock(
+        return_value=httpx.Response(200, json={"access_token": "TKN", "expires_in": 7200})
+    )
+    auction_item = {
+        **_ITEM,
+        "buyingOptions": ["AUCTION"],
+        "itemEndDate": "2030-01-01T00:00:00.000Z",
+    }
+    route = respx.get(f"{BROWSE}/item_summary/search").mock(
+        return_value=httpx.Response(200, json={"itemSummaries": [auction_item]})
+    )
+    src = EbayBrowseSource(EbayOAuth("id", "sec", OAUTH), BROWSE)
+
+    listings = src.fetch(
+        category_ids=["183454"],
+        buying_options=("AUCTION",),
+        item_end_within_hours=3,
+        sort="endingSoonest",
+    )
+
+    req = route.calls.last.request
+    assert "q" not in req.url.params  # category-only sweep, no keyword
+    assert req.url.params["category_ids"] == "183454"
+    assert req.url.params["sort"] == "endingSoonest"
+    flt = req.url.params["filter"]
+    assert "buyingOptions:{AUCTION}" in flt
+    assert "itemEndDate:[" in flt
+
+    assert listings[0].buying_format is BuyingFormat.AUCTION
+    assert listings[0].item_end_date == "2030-01-01T00:00:00.000Z"
+
+
+@respx.mock
 def test_token_is_cached_across_calls() -> None:
     token_route = respx.post(OAUTH).mock(
         return_value=httpx.Response(200, json={"access_token": "TKN", "expires_in": 7200})

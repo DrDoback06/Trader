@@ -21,6 +21,12 @@ class BuyingFormat(StrEnum):
     AUCTION = "AUCTION"
 
 
+class ScanMode(StrEnum):
+    WATCH = "WATCH"  # search specific card queries (the watchlist)
+    CHEAPEST = "CHEAPEST"  # sweep a category for cheapest BIN / Best-Offer
+    ENDING_SOON = "ENDING_SOON"  # auctions ending within a time window
+
+
 class GradeCompany(StrEnum):
     PSA = "PSA"
     CGC = "CGC"
@@ -82,15 +88,24 @@ class ParsedListing:
 
 @dataclass
 class WatchTarget:
-    """A search the scanner runs against a listing source. Higher priority =
-    scanned first when the daily call budget is tight."""
+    """A search the scanner runs against a listing source.
 
-    query: str
+    ``mode`` decides how it searches: a specific card query (WATCH), a whole-category
+    sweep for the cheapest BIN/Best-Offer listings (CHEAPEST), or auctions ending
+    within ``ending_within_hours`` (ENDING_SOON). Higher priority = scanned first
+    when the daily call budget is tight.
+    """
+
+    query: str = ""
     game: Game = Game.POKEMON
+    mode: ScanMode = ScanMode.WATCH
     category_ids: tuple[str, ...] = ()
     buying_options: tuple[str, ...] = ("FIXED_PRICE",)
     max_price: float | None = None
     condition_ids: tuple[str, ...] = ()
+    ending_within_hours: int | None = None
+    sort: str | None = None
+    pages: int = 1
     priority: int = 1
     limit: int = 50
     enabled: bool = True
@@ -113,6 +128,7 @@ class ListingFacts:
     category_id: str | None = None
     url: str | None = None
     image_url: str | None = None
+    item_end_date: str | None = None  # auction end time (UTC ISO8601), if any
 
 
 @dataclass

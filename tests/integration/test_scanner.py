@@ -9,7 +9,8 @@ from trader.core.models import WatchTarget
 from trader.providers.ebay_browse import EbayBrowseSource
 from trader.providers.ebay_oauth import EbayOAuth
 from trader.services.quota import DailyQuota
-from trader.services.scanner import scan
+from trader.services.scanner import _fetch_kwargs, scan
+from trader.services.watchlist import cheapest_sweep_target, ending_soon_sweep_target
 
 OAUTH = "https://api.ebay.com/identity/v1/oauth2/token"
 BROWSE = "https://api.ebay.com/buy/browse/v1"
@@ -49,6 +50,36 @@ def test_scan_dedups_and_produces_deals(catalogue: Any, sold_provider: Any) -> N
     assert result.listings_seen == 2
     assert result.new_listings == 1
     assert any(d.passed_rules for d in result.deals)
+
+
+def test_fetch_kwargs_per_mode() -> None:
+    cheapest = _fetch_kwargs(cheapest_sweep_target())
+    assert cheapest["sort"] == "price"
+    assert "BEST_OFFER" in cheapest["buying_options"]
+    assert cheapest["query"] is None  # category sweep, no keyword
+
+    ending = _fetch_kwargs(ending_soon_sweep_target(ending_within_hours=3))
+    assert ending["sort"] == "endingSoonest"
+    assert ending["buying_options"] == ("AUCTION",)
+    assert ending["item_end_within_hours"] == 3
+
+
+@respx.mock
+def test_sweep_paginates_within_quota(catalogue: Any, sold_provider: Any) -> None:
+    respx.post(OAUTH).mock(
+        return_value=httpx.Response(200, json={"access_token": "T", "expires_in": 7200})
+    )
+    respx.get(f"{BROWSE}/item_summary/search").mock(
+        return_value=httpx.Response(200, json={"itemSummaries": [_item("A")]})
+    )
+    src = EbayBrowseSource(EbayOAuth("id", "sec", OAUTH), BROWSE)
+    # limit=1 and a full page each time -> keeps paginating up to `pages`
+    target = WatchTarget(
+        query="charizard", category_ids=("183454",), limit=1, pages=3, priority=1
+    )
+
+    result = scan([target], src, catalogue, sold_provider, quota=DailyQuota(10))
+    assert result.calls_used == 3  # three pages swept
 
 
 @respx.mock

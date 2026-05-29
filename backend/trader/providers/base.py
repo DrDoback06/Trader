@@ -15,13 +15,15 @@ class ListingSource(Protocol):
     def fetch(
         self,
         *,
-        query: str,
+        query: str | None = None,
         limit: int = 50,
+        offset: int = 0,
         category_ids: Sequence[str] | None = None,
         buying_options: Sequence[str] = ("FIXED_PRICE",),
         max_price: float | None = None,
         condition_ids: Sequence[str] | None = None,
         item_location_country: str = "GB",
+        item_end_within_hours: float | None = None,
         sort: str | None = "newlyListed",
     ) -> Sequence[ListingFacts]: ...
 

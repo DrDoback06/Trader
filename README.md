@@ -75,6 +75,10 @@ wrong-language, mis-identified, and overpriced listings are correctly filtered o
   filters, mapped to the same `ListingFacts` the engine already understands.
 - **Quota-aware scanner** (`services/scanner.py` + `quota.py` + `dedup.py`): runs a prioritized
   `WatchTarget` list within a daily call budget, de-duplicates, and feeds the pipeline.
+- **Discovery / "scour" mode**: instead of naming cards, sweep a whole category for the
+  **cheapest Buy-It-Now & Best-Offer** listings, or **auctions ending soon** (1/2/3/6/12h window),
+  and let the engine surface the underpriced ones. The identifier turns a broad sweep into
+  per-card deals. (Coverage scales with the card catalogue — see the roadmap.)
 - **`POST /scan`** runs it live when eBay keys are set (`EBAY_CLIENT_ID/SECRET`, `EBAY_ENV`);
   without keys it returns a clear message. Sandbox-first via `EBAY_ENV=sandbox`.
 ## What's built (Phase 3 ✅ — live UK valuation + in-UI keys)

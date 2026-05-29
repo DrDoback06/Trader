@@ -13,6 +13,22 @@ function condLabel(d: Deal): string {
   return d.condition.replace("RAW_", "");
 }
 
+function endsIn(iso: string | null): string | null {
+  if (!iso) {
+    return null;
+  }
+  const ms = new Date(iso).getTime() - Date.now();
+  if (Number.isNaN(ms)) {
+    return null;
+  }
+  if (ms <= 0) {
+    return "ended";
+  }
+  const h = Math.floor(ms / 3_600_000);
+  const m = Math.floor((ms % 3_600_000) / 60_000);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
 export function DealsTable({ deals }: { deals: Deal[] }) {
   if (deals.length === 0) {
     return <p className="empty">No deals to show.</p>;
@@ -39,6 +55,8 @@ export function DealsTable({ deals }: { deals: Deal[] }) {
         {deals.map((d, i) => {
           const e = d.economics;
           const profitPos = e ? e.profit.amount >= 0 : false;
+          const isAuction = d.listing.buying_format === "AUCTION";
+          const ends = endsIn(d.listing.item_end_date);
           return (
             <tr key={d.id} className={d.passed_rules ? "pass" : "skip"}>
               <td className="num">{i + 1}</td>
@@ -48,6 +66,9 @@ export function DealsTable({ deals }: { deals: Deal[] }) {
                   {d.card ? <span className="cardno"> {d.card.number}</span> : null}
                 </div>
                 <div className="sub">{d.card ? d.card.set_name : d.listing.title}</div>
+                {isAuction && (
+                  <div className="auction">⏳ Auction{ends ? ` · ends in ${ends}` : ""}</div>
+                )}
                 {d.flags.length > 0 && (
                   <div className="flags">
                     {d.flags.map((f) => (

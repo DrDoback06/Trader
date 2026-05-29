@@ -467,3 +467,32 @@ table.srctable {
   background: #143a2a;
   color: var(--pos);
 }
+
+/* discovery controls */
+.spacer {
+  flex: 1;
+}
+
+.field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.field select {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 7px 9px;
+  font-size: 13px;
+}
+
+.auction {
+  margin-top: 3px;
+  color: #e7c454;
+  font-size: 12px;
+  font-weight: 600;
+}

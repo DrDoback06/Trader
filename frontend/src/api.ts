@@ -46,6 +46,12 @@ export function setSourceEnabled(id: string, enabled: boolean): Promise<SourceSt
   });
 }
 
-export function runScan(): Promise<ScanResult> {
-  return request<ScanResult>("/scan", { method: "POST" });
+export interface ScanOptions {
+  mode: string;
+  ending_within_hours?: number;
+  max_price?: number;
+}
+
+export function runScan(opts: ScanOptions): Promise<ScanResult> {
+  return request<ScanResult>("/scan", { method: "POST", body: JSON.stringify(opts) });
 }

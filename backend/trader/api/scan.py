@@ -13,12 +13,36 @@ from typing import Any
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel
 
+from ..core.models import WatchTarget
 from ..providers.factory import build_browse_source
 from ..services.scanner import scan
+from ..services.watchlist import cheapest_sweep_target, ending_soon_sweep_target
 from .serialize import deal_to_dict
 
 router = APIRouter(tags=["scan"])
+
+
+class ScanRequest(BaseModel):
+    # watchlist | cheapest | ending_soon | everything
+    mode: str = "watchlist"
+    ending_within_hours: int = 12
+    max_price: float | None = None
+
+
+def _targets_for(request: Request, body: ScanRequest) -> list[WatchTarget]:
+    watchlist = list(request.app.state.watchlist)
+    cheapest = cheapest_sweep_target(max_price=body.max_price)
+    ending = ending_soon_sweep_target(
+        ending_within_hours=body.ending_within_hours, max_price=body.max_price
+    )
+    return {
+        "watchlist": watchlist,
+        "cheapest": [cheapest],
+        "ending_soon": [ending],
+        "everything": [*watchlist, cheapest, ending],
+    }.get(body.mode, watchlist)
 
 
 @router.get("/watchlist")
@@ -33,7 +57,8 @@ def get_quota(request: Request) -> dict[str, Any]:
 
 
 @router.post("/scan")
-def run_scan(request: Request) -> dict[str, Any]:
+def run_scan(request: Request, body: ScanRequest | None = None) -> dict[str, Any]:
+    body = body or ScanRequest()
     source = build_browse_source(request.app.state.credentials, request.app.state.settings)
     if source is None:
         raise HTTPException(
@@ -46,7 +71,7 @@ def run_scan(request: Request) -> dict[str, Any]:
 
     try:
         result = scan(
-            request.app.state.watchlist,
+            _targets_for(request, body),
             source,
             request.app.state.catalogue,
             request.app.state.sold_provider,
@@ -63,6 +88,7 @@ def run_scan(request: Request) -> dict[str, Any]:
     # Cache the freshly scanned deals so GET /deals reflects the live scan.
     request.app.state.deals = result.deals
     return {
+        "mode": body.mode,
         "targets_scanned": result.targets_scanned,
         "calls_used": result.calls_used,
         "listings_seen": result.listings_seen,

@@ -10,6 +10,8 @@ export function DealsPage() {
   const [error, setError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanMsg, setScanMsg] = useState<string | null>(null);
+  const [mode, setMode] = useState("everything");
+  const [hours, setHours] = useState(6);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -28,9 +30,11 @@ export function DealsPage() {
     setScanning(true);
     setScanMsg(null);
     try {
-      const r = await runScan();
+      const r = await runScan({ mode, ending_within_hours: hours });
       setScanMsg(
-        `Scanned ${r.targets_scanned} targets · ${r.listings_seen} listings · ${r.new_listings} new.`,
+        `Scoured ${r.listings_seen} listings · ${r.new_listings} new${
+          r.quota_exhausted ? " (daily call budget hit)" : ""
+        }.`,
       );
       load();
     } catch (err: unknown) {
@@ -39,6 +43,8 @@ export function DealsPage() {
       setScanning(false);
     }
   };
+
+  const showHours = mode === "ending_soon" || mode === "everything";
 
   const stats = useMemo(() => {
     const passing = deals.filter((d) => d.passed_rules);
@@ -78,8 +84,34 @@ export function DealsPage() {
             checked={onlyPassing}
             onChange={(e) => setOnlyPassing(e.target.checked)}
           />
-          Show only deals that clear my buy rules
+          Only deals that clear my buy rules
         </label>
+
+        <span className="spacer" />
+
+        <label className="field">
+          Scan
+          <select value={mode} onChange={(e) => setMode(e.target.value)}>
+            <option value="everything">Everything (scour eBay)</option>
+            <option value="cheapest">Cheapest BIN &amp; offers</option>
+            <option value="ending_soon">Auctions ending soon</option>
+            <option value="watchlist">My watchlist cards</option>
+          </select>
+        </label>
+
+        {showHours && (
+          <label className="field">
+            ending within
+            <select value={hours} onChange={(e) => setHours(Number(e.target.value))}>
+              {[1, 2, 3, 6, 12].map((h) => (
+                <option key={h} value={h}>
+                  {h}h
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
         <button className="primary" onClick={onScan} disabled={scanning}>
           {scanning ? "Scanning…" : "↻ Run live eBay scan"}
         </button>

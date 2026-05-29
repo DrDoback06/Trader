@@ -37,6 +37,7 @@ export interface Listing {
   price: Money;
   shipping: Money | null;
   buying_format: string;
+  item_end_date: string | null;
   url: string | null;
   image_url: string | null;
 }
@@ -63,6 +64,7 @@ export interface SourcesResponse {
 }
 
 export interface ScanResult {
+  mode: string;
   targets_scanned: number;
   calls_used: number;
   listings_seen: number;

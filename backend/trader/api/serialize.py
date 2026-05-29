@@ -58,6 +58,7 @@ def deal_to_dict(deal: Deal) -> dict[str, Any]:
             "price": money_to_dict(deal.listing.price),
             "shipping": money_to_dict(deal.listing.shipping),
             "buying_format": deal.listing.buying_format.value,
+            "item_end_date": deal.listing.item_end_date,
             "url": deal.listing.url,
             "image_url": deal.listing.image_url,
         },
