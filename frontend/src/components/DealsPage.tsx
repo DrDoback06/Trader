@@ -105,6 +105,8 @@ export function DealsPage() {
             <option value="cheapest">Cheapest BIN &amp; offers</option>
             <option value="ending_soon">Auctions ending soon</option>
             <option value="hidden_gems">Hidden gems (typos)</option>
+            <option value="graded">Graded slabs (PSA/CGC)</option>
+            <option value="sealed">Sealed boxes / ETBs</option>
             <option value="watchlist">My watchlist cards</option>
           </select>
         </label>

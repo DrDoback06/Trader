@@ -88,7 +88,9 @@ def evaluate(
         reasons.append(f"ROI {econ.roi:.0%} below minimum {rules.min_roi:.0%}")
     if econ.margin < rules.min_margin:
         reasons.append(f"margin {econ.margin:.0%} below minimum {rules.min_margin:.0%}")
-    if deal.confidence < rules.min_confidence:
+    # Catalogue-free (UNVERIFIED) deals are an explicit rougher lens — gate them on
+    # economics, not identity confidence.
+    if "UNVERIFIED" not in ident.parsed.flags and deal.confidence < rules.min_confidence:
         reasons.append(f"confidence {deal.confidence:.2f} below minimum {rules.min_confidence:.2f}")
     if deal.sell_probability < rules.min_sell_probability:
         reasons.append(

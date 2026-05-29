@@ -6,6 +6,7 @@ fixtures (Phase 1) and on live data (Phases 2-3).
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 
 from ..core.confidence import ConfidenceConfig, compute_confidence
@@ -16,7 +17,7 @@ from ..core.economics import (
     compute_grading_economics,
     max_bid_for_target,
 )
-from ..core.models import BuyingFormat, Deal, Decision, Game, ListingFacts
+from ..core.models import BuyingFormat, Card, Deal, Game, ListingFacts, ParsedListing
 from ..core.rating import RatingConfig, annualised_roi
 from ..core.rating import sell_probability as compute_sell_probability
 from ..core.rules import RuleSet, evaluate
@@ -26,6 +27,8 @@ from ..identify.matcher import MatcherConfig, identify
 from ..identify.normalize import normalize_condition
 from ..identify.parser import parse_listing
 from ..providers.base import SoldPriceProvider
+
+_FREE_HARD_FLAGS = ("PROXY", "FAKE", "LOT")
 
 
 @dataclass
@@ -37,7 +40,18 @@ class PipelineConfig:
     rating: RatingConfig = field(default_factory=RatingConfig)
     grading: GradingProfile = field(default_factory=GradingProfile.default_uk)
     evaluate_grading: bool = True
+    # Catalogue-free valuation: value unmatched listings (e.g. sealed products) by
+    # their title alone. Lower-certainty, flagged UNVERIFIED — used in sealed mode.
+    catalogue_free: bool = False
     game: Game = Game.POKEMON
+
+
+def _synthetic_card(listing: ListingFacts, parsed: ParsedListing, game: Game) -> Card:
+    title = (listing.title or "").strip()
+    cid = "FREE:" + hashlib.sha1(title.lower().encode()).hexdigest()[:12]
+    return Card(
+        id=cid, game=game, set_code="", set_name="", number=parsed.number or "", name=title
+    )
 
 
 def evaluate_listing(
@@ -52,7 +66,19 @@ def evaluate_listing(
 
     deal = Deal(listing=listing, identification=ident)
 
-    if ident.decision is Decision.REJECTED or ident.card is None:
+    # Catalogue-free fallback: value an unmatched listing by its title (sealed mode).
+    if (
+        ident.card is None
+        and cfg.catalogue_free
+        and len((listing.title or "").strip()) >= 8
+        and not any(f in _FREE_HARD_FLAGS for f in parsed.flags)
+    ):
+        ident.card = _synthetic_card(listing, parsed, cfg.game)
+        ident.match_score = 0.85
+        if "UNVERIFIED" not in parsed.flags:
+            parsed.flags.append("UNVERIFIED")
+
+    if ident.card is None:
         deal.rule_reasons = [f"identification: {ident.decision.value}"]
         return deal
 

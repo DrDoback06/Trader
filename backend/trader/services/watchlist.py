@@ -50,6 +50,51 @@ def ending_soon_sweep_target(
     )
 
 
+def graded_sweep_targets(
+    *, category_ids: tuple[str, ...] = (POKEMON_SINGLES_GB,), max_price: float | None = None,
+    limit: int = 100,
+) -> list[WatchTarget]:
+    """Sweep for slabbed cards (PSA/CGC) — valued against graded sold prices."""
+    queries = ("pokemon psa 10", "pokemon cgc 10", "pokemon charizard psa 10", "pokemon psa 9")
+    return [
+        WatchTarget(
+            query=q,
+            game=Game.POKEMON,
+            category_ids=category_ids,
+            buying_options=("FIXED_PRICE", "BEST_OFFER", "AUCTION"),
+            sort="price",
+            max_price=max_price,
+            limit=limit,
+            priority=3,
+        )
+        for q in queries
+    ]
+
+
+def sealed_sweep_targets(
+    *, max_price: float | None = None, limit: int = 100
+) -> list[WatchTarget]:
+    """Sweep for sealed product (boxes / ETBs / bundles). Valued catalogue-free."""
+    queries = (
+        "pokemon booster box",
+        "pokemon elite trainer box",
+        "pokemon booster bundle",
+        "pokemon 151 booster box",
+    )
+    return [
+        WatchTarget(
+            query=q,
+            game=Game.POKEMON,
+            buying_options=("FIXED_PRICE", "BEST_OFFER"),
+            sort="price",
+            max_price=max_price,
+            limit=limit,
+            priority=3,
+        )
+        for q in queries
+    ]
+
+
 def hidden_gem_targets(
     *, category_ids: tuple[str, ...] = (POKEMON_SINGLES_GB,), max_price: float | None = None,
     limit: int = 50,

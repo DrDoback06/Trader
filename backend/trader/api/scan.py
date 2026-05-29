@@ -8,7 +8,7 @@ exercise the scan path via a mocked HTTP layer.
 
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from typing import Any
 
 import httpx
@@ -22,7 +22,9 @@ from ..services.trends import attach_trends, record_snapshots
 from ..services.watchlist import (
     cheapest_sweep_target,
     ending_soon_sweep_target,
+    graded_sweep_targets,
     hidden_gem_targets,
+    sealed_sweep_targets,
 )
 from .serialize import deal_to_dict
 
@@ -47,6 +49,8 @@ def _targets_for(request: Request, body: ScanRequest) -> list[WatchTarget]:
         "cheapest": [cheapest],
         "ending_soon": [ending],
         "hidden_gems": hidden_gem_targets(max_price=body.max_price),
+        "graded": graded_sweep_targets(max_price=body.max_price),
+        "sealed": sealed_sweep_targets(max_price=body.max_price),
         "everything": [*watchlist, cheapest, ending],
     }.get(body.mode, watchlist)
 
@@ -75,6 +79,10 @@ def run_scan(request: Request, body: ScanRequest | None = None) -> dict[str, Any
             ),
         )
 
+    cfg = request.app.state.pipeline_cfg
+    if body.mode == "sealed":
+        cfg = replace(cfg, catalogue_free=True)  # value sealed product by title
+
     try:
         result = scan(
             _targets_for(request, body),
@@ -82,7 +90,7 @@ def run_scan(request: Request, body: ScanRequest | None = None) -> dict[str, Any
             request.app.state.catalogue,
             request.app.state.sold_provider,
             quota=request.app.state.quota,
-            cfg=request.app.state.pipeline_cfg,
+            cfg=cfg,
         )
     except httpx.HTTPStatusError as exc:
         detail = "eBay rejected the request"
