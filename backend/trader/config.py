@@ -12,6 +12,9 @@ class Settings(BaseSettings):
 
     app_env: str = "dev"
     log_level: str = "INFO"
+    # When set, the whole app (dashboard + API) is gated behind HTTP Basic auth.
+    # Leave empty for open access (local dev / demo). `/health` is always open.
+    access_password: str = ""
 
     # Phase 1
     total_budget_gbp: float = 300.0

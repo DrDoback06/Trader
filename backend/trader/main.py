@@ -8,9 +8,12 @@ runtime; the catalogue and selected providers are shared across paths.
 
 from __future__ import annotations
 
+import base64
+import binascii
+import hmac
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -27,6 +30,18 @@ from .services.pipeline import PipelineConfig
 from .services.quota import DailyQuota
 from .services.sources import DEFAULT_ENABLED
 from .services.watchlist import default_watchlist
+
+
+def _basic_auth_ok(header: str | None, password: str) -> bool:
+    """True if the Authorization header carries the right Basic password."""
+    if not header or not header.startswith("Basic "):
+        return False
+    try:
+        decoded = base64.b64decode(header[6:]).decode()
+    except (binascii.Error, ValueError):
+        return False
+    _, _, supplied = decoded.partition(":")  # any username; password must match
+    return hmac.compare_digest(supplied, password)
 
 
 def create_app() -> FastAPI:
@@ -56,6 +71,18 @@ def create_app() -> FastAPI:
     configure_app_providers(app)
     # Start with demo deals so the dashboard has content before the first live scan.
     app.state.deals = build_demo_deals(app.state.pipeline_cfg)
+
+    @app.middleware("http")
+    async def require_password(request: Request, call_next):
+        password = request.app.state.settings.access_password
+        is_open = request.method == "OPTIONS" or request.url.path == "/health"
+        if password and not is_open and not _basic_auth_ok(
+            request.headers.get("Authorization"), password
+        ):
+            return Response(
+                status_code=401, headers={"WWW-Authenticate": 'Basic realm="Trader"'}
+            )
+        return await call_next(request)
 
     app.include_router(health_api.router)
     app.include_router(deals_api.router)

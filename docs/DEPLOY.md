@@ -45,5 +45,6 @@ into the in-app **Sources & Keys** page (stored on the server, masked when read)
 ## ⚠️ Security
 
 A public URL means anyone who finds it can use the app and spend your eBay/RapidAPI
-quota (they can't read your keys — those are masked). For real use, put it behind a
-password — ask and I'll add simple access auth via an env var.
+quota. **Set `ACCESS_PASSWORD`** (an env var) to gate the whole app behind an HTTP
+Basic prompt — your browser asks once, then remembers it. `/health` stays open so
+Render's health check still works. With no `ACCESS_PASSWORD` set, the app is open.

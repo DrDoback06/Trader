@@ -12,6 +12,9 @@ services:
     envVars:
       - key: EBAY_ENV
         value: production
+      # Set a password to gate the whole app (recommended for a public URL).
+      - key: ACCESS_PASSWORD
+        sync: false
       # Set these in the Render dashboard (kept out of git). You can also enter
       # them later in the app's "Sources & Keys" page instead.
       - key: EBAY_CLIENT_ID
