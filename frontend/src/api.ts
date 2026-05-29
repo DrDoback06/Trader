@@ -1,4 +1,11 @@
-import type { Deal, ScanResult, SourcesResponse, SourceState } from "./types";
+import type {
+  Allocation,
+  Deal,
+  Portfolio,
+  ScanResult,
+  SourcesResponse,
+  SourceState,
+} from "./types";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
 
@@ -54,4 +61,23 @@ export interface ScanOptions {
 
 export function runScan(opts: ScanOptions): Promise<ScanResult> {
   return request<ScanResult>("/scan", { method: "POST", body: JSON.stringify(opts) });
+}
+
+export function fetchAllocation(budget?: number): Promise<Allocation> {
+  return request<Allocation>(`/allocate${budget != null ? `?budget=${budget}` : ""}`);
+}
+
+export function fetchPortfolio(): Promise<Portfolio> {
+  return request<Portfolio>("/portfolio");
+}
+
+export function buyDeal(dealId: string): Promise<{ position_id: number }> {
+  return request("/portfolio/buy", { method: "POST", body: JSON.stringify({ deal_id: dealId }) });
+}
+
+export function sellPosition(id: number, price: number): Promise<Portfolio> {
+  return request<Portfolio>(`/portfolio/${id}/sell`, {
+    method: "POST",
+    body: JSON.stringify({ price }),
+  });
 }

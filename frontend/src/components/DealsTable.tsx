@@ -29,7 +29,13 @@ function endsIn(iso: string | null): string | null {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-export function DealsTable({ deals }: { deals: Deal[] }) {
+export function DealsTable({
+  deals,
+  onBuy,
+}: {
+  deals: Deal[];
+  onBuy?: (id: string) => void;
+}) {
   if (deals.length === 0) {
     return <p className="empty">No deals to show.</p>;
   }
@@ -170,12 +176,21 @@ export function DealsTable({ deals }: { deals: Deal[] }) {
                   </span>
                 )}
               </td>
-              <td>
+              <td className="actions">
                 {d.listing.url ? (
                   <a className="buy" href={d.listing.url} target="_blank" rel="noreferrer">
                     Open ↗
                   </a>
                 ) : null}
+                {onBuy && d.economics && (
+                  <button
+                    className="bought"
+                    title="Mark as bought (track in portfolio)"
+                    onClick={() => onBuy(d.id)}
+                  >
+                    📌 Bought
+                  </button>
+                )}
               </td>
             </tr>
           );

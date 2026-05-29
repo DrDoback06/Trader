@@ -68,6 +68,32 @@ export interface SourcesResponse {
   note: string;
 }
 
+export interface Allocation {
+  budget: { amount: number; display: string };
+  total_cost: { amount: number; display: string };
+  total_expected_profit: number;
+  skipped_over_budget: number;
+  chosen: Deal[];
+}
+
+export interface Position {
+  id: number;
+  card: string;
+  cost_basis: number;
+  est_value: number;
+  status: string;
+  sold_price: number | null;
+  url: string;
+}
+
+export interface Portfolio {
+  positions: Position[];
+  held: number;
+  invested: number;
+  unrealised_pnl: number;
+  realised_pnl: number;
+}
+
 export interface ScanResult {
   mode: string;
   targets_scanned: number;

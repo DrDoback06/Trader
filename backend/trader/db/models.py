@@ -38,3 +38,20 @@ class PriceSnapshotRow(Base):
     condition_key: Mapped[str] = mapped_column(String(32))
     median: Mapped[float] = mapped_column(Float)
     captured_at: Mapped[datetime] = mapped_column(default=_utcnow, index=True)
+
+
+class PositionRow(Base):
+    """A card you've bought (or sold) — for portfolio P&L tracking."""
+
+    __tablename__ = "positions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    card_id: Mapped[str] = mapped_column(String(128), index=True)
+    card_name: Mapped[str] = mapped_column(String(256), default="")
+    cost_basis: Mapped[float] = mapped_column(Float)  # what you paid (buy cost)
+    est_value: Mapped[float] = mapped_column(Float)  # market value at purchase
+    status: Mapped[str] = mapped_column(String(16), default="HELD")  # HELD | SOLD
+    sold_price: Mapped[float | None] = mapped_column(Float, default=None)
+    url: Mapped[str] = mapped_column(String(512), default="")
+    acquired_at: Mapped[datetime] = mapped_column(default=_utcnow)
+    sold_at: Mapped[datetime | None] = mapped_column(default=None)

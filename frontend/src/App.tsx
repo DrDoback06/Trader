@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { DealsPage } from "./components/DealsPage";
+import { PortfolioPage } from "./components/PortfolioPage";
 import { SourcesPage } from "./components/SourcesPage";
 
-type View = "deals" | "sources";
+type View = "deals" | "portfolio" | "sources";
 
 export default function App() {
   const [view, setView] = useState<View>("deals");
@@ -20,13 +21,21 @@ export default function App() {
           <button className={view === "deals" ? "active" : ""} onClick={() => setView("deals")}>
             Deals
           </button>
+          <button
+            className={view === "portfolio" ? "active" : ""}
+            onClick={() => setView("portfolio")}
+          >
+            Portfolio
+          </button>
           <button className={view === "sources" ? "active" : ""} onClick={() => setView("sources")}>
             Sources &amp; Keys
           </button>
         </nav>
       </header>
 
-      {view === "deals" ? <DealsPage /> : <SourcesPage />}
+      {view === "deals" && <DealsPage />}
+      {view === "portfolio" && <PortfolioPage />}
+      {view === "sources" && <SourcesPage />}
 
       <footer className="foot">
         Decision-support only — no automated buying. You are responsible for your own purchases and

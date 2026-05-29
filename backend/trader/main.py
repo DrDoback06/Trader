@@ -20,6 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from .api import alerts as alerts_api
 from .api import deals as deals_api
 from .api import health as health_api
+from .api import portfolio as portfolio_api
 from .api import scan as scan_api
 from .api import settings as settings_api
 from .api import sources as sources_api
@@ -96,6 +97,7 @@ def create_app() -> FastAPI:
     app.include_router(scan_api.router)
     app.include_router(sources_api.router)
     app.include_router(alerts_api.router)
+    app.include_router(portfolio_api.router)
 
     # Periodically scour + alert when SCAN_INTERVAL_MIN > 0 and eBay is configured.
     app.state.scheduler = start_scheduler(app)

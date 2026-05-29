@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { fetchDeals, runScan } from "../api";
+import { buyDeal, fetchDeals, runScan } from "../api";
 import type { Deal } from "../types";
 import { DealsTable } from "./DealsTable";
 
@@ -41,6 +41,15 @@ export function DealsPage() {
       setScanMsg(err instanceof Error ? err.message : "scan failed");
     } finally {
       setScanning(false);
+    }
+  };
+
+  const onBuy = async (dealId: string) => {
+    try {
+      await buyDeal(dealId);
+      setScanMsg("Added to your portfolio 📌");
+    } catch (err: unknown) {
+      setScanMsg(err instanceof Error ? err.message : "could not add to portfolio");
     }
   };
 
@@ -125,7 +134,7 @@ export function DealsPage() {
           {error}. Is the backend running on <code>http://localhost:8000</code>?
         </p>
       )}
-      {!loading && !error && <DealsTable deals={deals} />}
+      {!loading && !error && <DealsTable deals={deals} onBuy={onBuy} />}
     </>
   );
 }
