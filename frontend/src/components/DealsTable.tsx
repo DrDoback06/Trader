@@ -13,6 +13,13 @@ function condLabel(d: Deal): string {
   return d.condition.replace("RAW_", "");
 }
 
+function buyType(d: Deal): string {
+  if (d.listing.buying_format === "AUCTION") {
+    return "Auction";
+  }
+  return d.listing.accepts_best_offer ? "BIN + Offer" : "BIN";
+}
+
 function endsIn(iso: string | null): string | null {
   if (!iso) {
     return null;
@@ -46,6 +53,7 @@ export function DealsTable({
           <th className="num">#</th>
           <th>Card</th>
           <th>Cond.</th>
+          <th>Type</th>
           <th className="r">Ask</th>
           <th className="r">Est. value</th>
           <th className="r">Profit</th>
@@ -120,6 +128,10 @@ export function DealsTable({
                 )}
               </td>
               <td>{condLabel(d)}</td>
+              <td className="btype">
+                <span className="typebadge">{buyType(d)}</span>
+                {isAuction && ends ? <div className="sub">⏳ {ends}</div> : null}
+              </td>
               <td className="r">
                 {askMoney.display}
                 {d.listing.shipping && d.listing.shipping.amount > 0 ? (

@@ -3,6 +3,32 @@ import { buyDeal, evaluateCard, fetchDeals, runScan } from "../api";
 import type { Deal } from "../types";
 import { DealsTable } from "./DealsTable";
 
+// Total you'd pay right now (current bid for auctions, else price) + postage.
+function effAsk(d: Deal): number {
+  const base =
+    d.listing.buying_format === "AUCTION" && d.listing.current_bid_price
+      ? d.listing.current_bid_price.amount
+      : d.listing.price.amount;
+  return base + (d.listing.shipping?.amount ?? 0);
+}
+
+function endTs(d: Deal): number {
+  if (!d.listing.item_end_date) {
+    return Number.POSITIVE_INFINITY;
+  }
+  const t = new Date(d.listing.item_end_date).getTime();
+  return Number.isNaN(t) ? Number.POSITIVE_INFINITY : t;
+}
+
+const SORTERS: Record<string, (a: Deal, b: Deal) => number> = {
+  best: (a, b) => b.score - a.score,
+  ending: (a, b) => endTs(a) - endTs(b),
+  price: (a, b) => effAsk(a) - effAsk(b),
+  roi: (a, b) => (b.economics?.roi ?? -Infinity) - (a.economics?.roi ?? -Infinity),
+  discount: (a, b) => (b.discount ?? -Infinity) - (a.discount ?? -Infinity),
+  sell: (a, b) => b.sell_probability - a.sell_probability,
+};
+
 export function DealsPage() {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [onlyPassing, setOnlyPassing] = useState(false);
@@ -14,6 +40,12 @@ export function DealsPage() {
   const [hours, setHours] = useState(6);
   const [scanned, setScanned] = useState(false);
   const [hideSamples, setHideSamples] = useState(false);
+
+  // eBay-style filter / sort of the results (client-side).
+  const [sortBy, setSortBy] = useState("best");
+  const [fType, setFType] = useState("all");
+  const [fCond, setFCond] = useState("all");
+  const [fMax, setFMax] = useState("");
 
   // "Check a card" — a real valuation using your live sold-price key, no eBay key needed.
   const [checks, setChecks] = useState<Deal[]>([]);
@@ -47,6 +79,7 @@ export function DealsPage() {
         }.`,
       );
       setScanned(true);
+      setHideSamples(false);
       load();
     } catch (err: unknown) {
       setScanMsg(err instanceof Error ? err.message : "scan failed");
@@ -94,6 +127,20 @@ export function DealsPage() {
 
   const showHours = mode === "ending_soon" || mode === "everything";
   const showSamples = !scanned && !hideSamples;
+
+  const visible = useMemo(() => {
+    const maxP = Number(fMax);
+    const xs = deals.filter((d) => {
+      if (fType === "auction" && d.listing.buying_format !== "AUCTION") return false;
+      if (fType === "bin" && d.listing.buying_format !== "FIXED_PRICE") return false;
+      if (fType === "offer" && !d.listing.accepts_best_offer) return false;
+      if (fCond === "graded" && !d.is_graded) return false;
+      if (fCond === "raw" && d.is_graded) return false;
+      if (Number.isFinite(maxP) && maxP > 0 && effAsk(d) > maxP) return false;
+      return true;
+    });
+    return [...xs].sort(SORTERS[sortBy] ?? SORTERS.best);
+  }, [deals, fType, fCond, fMax, sortBy]);
 
   const stats = useMemo(() => {
     const passing = deals.filter((d) => d.passed_rules);
@@ -241,13 +288,60 @@ export function DealsPage() {
         </div>
       )}
 
+      {!loading && !error && !hideSamples && (
+        <div className="controls filterbar">
+          <label className="field">
+            Sort
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+              <option value="best">Best match</option>
+              <option value="ending">Ending soonest</option>
+              <option value="price">Price + P&amp;P: low → high</option>
+              <option value="roi">Highest ROI</option>
+              <option value="discount">Biggest discount</option>
+              <option value="sell">Best sell-through</option>
+            </select>
+          </label>
+          <label className="field">
+            Type
+            <select value={fType} onChange={(e) => setFType(e.target.value)}>
+              <option value="all">All listings</option>
+              <option value="bin">Buy It Now</option>
+              <option value="offer">Accepts offers</option>
+              <option value="auction">Auction</option>
+            </select>
+          </label>
+          <label className="field">
+            Condition
+            <select value={fCond} onChange={(e) => setFCond(e.target.value)}>
+              <option value="all">Any</option>
+              <option value="raw">Raw</option>
+              <option value="graded">Graded</option>
+            </select>
+          </label>
+          <label className="field">
+            Max £ (inc P&amp;P)
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={fMax}
+              onChange={(e) => setFMax(e.target.value)}
+            />
+          </label>
+          <span className="spacer" />
+          <span className="count">
+            {visible.length} of {deals.length}
+          </span>
+        </div>
+      )}
+
       {loading && <p className="empty">Loading…</p>}
       {error && (
         <p className="error">
           {error}. Is the backend running on <code>http://localhost:8000</code>?
         </p>
       )}
-      {!loading && !error && !hideSamples && <DealsTable deals={deals} onBuy={onBuy} />}
+      {!loading && !error && !hideSamples && <DealsTable deals={visible} onBuy={onBuy} />}
       {!loading && !error && hideSamples && !scanned && (
         <p className="empty">
           Samples hidden. Use “Check a card” above, or run a live scan once your eBay keys are in.

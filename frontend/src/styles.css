@@ -527,6 +527,25 @@ table.srctable {
   padding: 0;
 }
 
+.typebadge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.filterbar {
+  margin: 14px 0 8px;
+}
+
+.filterbar .count {
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .auction {
   margin-top: 3px;
   color: #e7c454;
