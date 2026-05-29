@@ -51,6 +51,9 @@ def to_catalogue_card(card: dict[str, Any]) -> dict[str, Any]:
     out: dict[str, Any] = {"number": card_number(card, set_obj), "name": card.get("name", "")}
     if card.get("rarity"):
         out["rarity"] = card["rarity"]
+    image = (card.get("images") or {}).get("small", "")
+    if image:
+        out["image"] = image
     return out
 
 
@@ -67,6 +70,7 @@ def group_to_sets(cards: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
                 "game": "POKEMON",
                 "set_code": code,
                 "set_name": set_obj.get("name", code),
+                "set_image": (set_obj.get("images") or {}).get("logo", ""),
                 "cards": [],
             },
         )
@@ -120,7 +124,7 @@ def fetch_all_cards(
     while True:
         resp = _get_with_retry(
             client,
-            {"page": page, "pageSize": page_size, "select": "id,name,number,rarity,set"},
+            {"page": page, "pageSize": page_size, "select": "id,name,number,rarity,set,images"},
             headers,
         )
         data = resp.json()

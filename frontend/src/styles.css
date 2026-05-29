@@ -563,6 +563,69 @@ table.srctable {
   font-weight: 600;
 }
 
+/* catalogue browser */
+.settiles,
+.cardgrid {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.settiles {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+
+.cardgrid {
+  grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
+}
+
+.settile,
+.cardtile {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  cursor: pointer;
+  text-align: center;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+}
+
+.settile:hover,
+.cardtile:hover {
+  border-color: var(--accent);
+}
+
+.settile img {
+  height: 54px;
+  object-fit: contain;
+}
+
+.cardtile img {
+  width: 100%;
+  border-radius: 6px;
+}
+
+.settile .setcode,
+.cardtile .noimg {
+  font-weight: 800;
+  font-size: 20px;
+  color: var(--muted);
+  height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.setname,
+.cardname {
+  font-weight: 700;
+  font-size: 13px;
+}
+
 .auction {
   margin-top: 3px;
   color: #e7c454;

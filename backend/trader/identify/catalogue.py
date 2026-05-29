@@ -46,6 +46,7 @@ def name_tokens(name: str) -> list[str]:
 class Catalogue:
     def __init__(self, cards: list[Card]) -> None:
         self.cards = cards
+        self.set_meta: dict[str, dict[str, str]] = {}  # set_code -> {"image", "name"}
         self._by_game: dict[Game, list[Card]] = defaultdict(list)
         self._by_num: dict[tuple[Game, int], list[Card]] = defaultdict(list)
         self._by_name_token: dict[tuple[Game, str], list[Card]] = defaultdict(list)
@@ -63,11 +64,13 @@ class Catalogue:
     @classmethod
     def from_dir(cls, path: str | Path) -> Catalogue:
         cards: list[Card] = []
+        set_meta: dict[str, dict[str, str]] = {}
         for fp in sorted(Path(path).rglob("*.json")):
             data = json.loads(fp.read_text(encoding="utf-8"))
             game = Game(data["game"])
             set_code = data["set_code"]
             set_name = data["set_name"]
+            set_meta.setdefault(set_code, {"image": data.get("set_image", ""), "name": set_name})
             for cd in data["cards"]:
                 number = canon_number(cd["number"])
                 cards.append(
@@ -82,9 +85,12 @@ class Catalogue:
                         finish=cd.get("finish"),
                         language=cd.get("language", "English"),
                         aliases=tuple(cd.get("aliases", [])),
+                        image_url=cd.get("image", ""),
                     )
                 )
-        return cls(cards)
+        cat = cls(cards)
+        cat.set_meta = set_meta
+        return cat
 
     def candidates(
         self,
@@ -110,3 +116,26 @@ class Catalogue:
                 return list(seen.values())
 
         return list(self._by_game.get(game, []))
+
+    def sets(self, game: Game = Game.POKEMON) -> list[dict[str, object]]:
+        """Every set for a game, with its card count and (if imported) a logo image."""
+        counts: dict[str, int] = defaultdict(int)
+        names: dict[str, str] = {}
+        for c in self._by_game.get(game, []):
+            counts[c.set_code] += 1
+            names.setdefault(c.set_code, c.set_name)
+        out: list[dict[str, object]] = [
+            {
+                "set_code": code,
+                "set_name": names[code],
+                "count": counts[code],
+                "image": self.set_meta.get(code, {}).get("image", ""),
+            }
+            for code in names
+        ]
+        return sorted(out, key=lambda s: str(s["set_name"]))
+
+    def cards_in_set(self, set_code: str, game: Game = Game.POKEMON) -> list[Card]:
+        """All cards in a set, ordered by collector number."""
+        cards = [c for c in self._by_game.get(game, []) if c.set_code == set_code]
+        return sorted(cards, key=lambda c: (numerator(c.number) or 9999, c.number))

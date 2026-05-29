@@ -1,9 +1,11 @@
 import type {
   Allocation,
+  CatalogueCard,
   Deal,
   Portfolio,
   RelistPreview,
   ScanResult,
+  SetInfo,
   SourcesResponse,
   SourceState,
 } from "./types";
@@ -72,6 +74,16 @@ export interface EvaluateInput {
 
 export function evaluateCard(input: EvaluateInput): Promise<Deal> {
   return request<Deal>("/evaluate", { method: "POST", body: JSON.stringify(input) });
+}
+
+export function fetchSets(): Promise<{ total_cards: number; sets: SetInfo[] }> {
+  return request("/catalogue/sets");
+}
+
+export function fetchSetCards(
+  setCode: string,
+): Promise<{ set_code: string; set_name: string; cards: CatalogueCard[] }> {
+  return request(`/catalogue/sets/${encodeURIComponent(setCode)}/cards`);
 }
 
 export function fetchAllocation(budget?: number): Promise<Allocation> {

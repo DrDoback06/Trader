@@ -79,6 +79,7 @@ class Card:
     finish: str | None = None
     language: str = "English"
     aliases: tuple[str, ...] = ()
+    image_url: str = ""
 
 
 @dataclass

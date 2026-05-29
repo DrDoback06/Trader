@@ -29,7 +29,13 @@ const SORTERS: Record<string, (a: Deal, b: Deal) => number> = {
   sell: (a, b) => b.sell_probability - a.sell_probability,
 };
 
-export function DealsPage() {
+export function DealsPage({
+  prefillQuery = null,
+  onPrefillConsumed,
+}: {
+  prefillQuery?: string | null;
+  onPrefillConsumed?: () => void;
+} = {}) {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [onlyPassing, setOnlyPassing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -67,6 +73,15 @@ export function DealsPage() {
   }, [onlyPassing]);
 
   useEffect(() => load(), [load]);
+
+  // A card picked in the Browse tab pre-fills the "Check a card" box here.
+  useEffect(() => {
+    if (prefillQuery) {
+      setCardQuery(prefillQuery);
+      onPrefillConsumed?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefillQuery]);
 
   const onScan = async () => {
     setScanning(true);

@@ -47,6 +47,22 @@ export interface Listing {
   image_url: string | null;
 }
 
+export interface SetInfo {
+  set_code: string;
+  set_name: string;
+  count: number;
+  image: string;
+}
+
+export interface CatalogueCard {
+  id: string;
+  name: string;
+  number: string;
+  rarity: string | null;
+  finish: string | null;
+  image_url: string;
+}
+
 export interface SourceState {
   id: string;
   name: string;

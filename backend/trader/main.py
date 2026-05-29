@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .api import alerts as alerts_api
+from .api import catalogue as catalogue_api
 from .api import deals as deals_api
 from .api import health as health_api
 from .api import portfolio as portfolio_api
@@ -100,6 +101,7 @@ def create_app() -> FastAPI:
     app.include_router(sources_api.router)
     app.include_router(alerts_api.router)
     app.include_router(portfolio_api.router)
+    app.include_router(catalogue_api.router)
 
     # Periodically scour + alert when SCAN_INTERVAL_MIN > 0 and eBay is configured.
     app.state.scheduler = start_scheduler(app)
