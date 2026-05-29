@@ -27,6 +27,15 @@ so you can see and trust the money logic before wiring in live data.
 
 ## Run it
 
+**Quickstart — one command** (creates the venv, installs deps, builds the dashboard, serves it):
+
+```bash
+./run.sh        # → http://localhost:8000   (add --catalogue to import the full set list first)
+```
+
+Then open **http://localhost:8000** and paste your keys under **Sources & Keys** — each input has a
+"where to get this ↗" link. Or do it step by step:
+
 ```bash
 # 1. Backend deps
 python3 -m venv .venv
