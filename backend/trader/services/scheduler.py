@@ -15,6 +15,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from ..providers.factory import build_alert_channel, build_browse_source
 from .alerts import dispatch_alerts
 from .scanner import scan
+from .trends import attach_trends, record_snapshots
 from .watchlist import cheapest_sweep_target, ending_soon_sweep_target
 
 log = logging.getLogger(__name__)
@@ -34,6 +35,8 @@ def run_scan_cycle(app: Any) -> int:
         quota=app.state.quota,
         cfg=app.state.pipeline_cfg,
     )
+    attach_trends(app.state.session_maker, result.deals)
+    record_snapshots(app.state.session_maker, result.deals)
     app.state.deals = result.deals
     channel = build_alert_channel(app.state.settings)
     return dispatch_alerts(

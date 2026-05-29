@@ -99,6 +99,7 @@ export interface Deal {
   annualised_roi: number | null;
   max_bid: Money | null;
   grading: Grading | null;
+  trend_pct: number | null;
   decision: string;
   match_score: number;
   card: CardRef | null;

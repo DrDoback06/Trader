@@ -65,6 +65,14 @@ def discount_vs_market(econ: EconomicsResult) -> float:
     return float((value - econ.buy_cost.amount) / value)
 
 
+def price_trend(current: float, earlier: float | None) -> float | None:
+    """Fractional change in market value vs an earlier sample (rising = positive).
+    Buying into momentum: today's comp is already stale if the card is climbing."""
+    if earlier is None or earlier <= 0:
+        return None
+    return (current - earlier) / earlier
+
+
 def annualised_roi(roi: float, days_to_sell: float | None) -> float | None:
     """ROI scaled by how often the capital turns over in a year. The real money
     metric: a 20% flip in 5 days beats a 60% flip that sits for 6 months."""

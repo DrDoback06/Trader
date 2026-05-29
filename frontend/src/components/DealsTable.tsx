@@ -90,6 +90,14 @@ export function DealsTable({ deals }: { deals: Deal[] }) {
                     🔼 Grade → +{d.grading.expected_profit.display} ({pct(d.grading.expected_roi)} EV)
                   </div>
                 )}
+                {d.trend_pct != null && Math.abs(d.trend_pct) >= 0.05 && (
+                  <div
+                    className={d.trend_pct > 0 ? "trend up" : "trend down"}
+                    title="Market-value momentum vs recent history"
+                  >
+                    {d.trend_pct > 0 ? "🔥" : "🔻"} {pct(d.trend_pct)}
+                  </div>
+                )}
                 {d.flags.length > 0 && (
                   <div className="flags">
                     {d.flags.map((f) => (

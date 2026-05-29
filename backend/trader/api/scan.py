@@ -18,6 +18,7 @@ from pydantic import BaseModel
 from ..core.models import WatchTarget
 from ..providers.factory import build_browse_source
 from ..services.scanner import scan
+from ..services.trends import attach_trends, record_snapshots
 from ..services.watchlist import (
     cheapest_sweep_target,
     ending_soon_sweep_target,
@@ -90,6 +91,10 @@ def run_scan(request: Request, body: ScanRequest | None = None) -> dict[str, Any
         raise HTTPException(status_code=502, detail=detail) from exc
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=502, detail=f"Could not reach eBay: {exc}") from exc
+
+    # Momentum: compare to prior history, then record today's sample.
+    attach_trends(request.app.state.session_maker, result.deals)
+    record_snapshots(request.app.state.session_maker, result.deals)
     # Cache the freshly scanned deals so GET /deals reflects the live scan.
     request.app.state.deals = result.deals
     return {

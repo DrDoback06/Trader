@@ -503,3 +503,17 @@ table.srctable {
   font-size: 12px;
   font-weight: 700;
 }
+
+.trend {
+  margin-top: 3px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.trend.up {
+  color: var(--pos);
+}
+
+.trend.down {
+  color: var(--neg);
+}

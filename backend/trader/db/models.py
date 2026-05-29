@@ -26,3 +26,15 @@ class AlertRow(Base):
     card: Mapped[str] = mapped_column(String(256), default="")
     profit: Mapped[float] = mapped_column(Float, default=0.0)
     created_at: Mapped[datetime] = mapped_column(default=_utcnow)
+
+
+class PriceSnapshotRow(Base):
+    """A market-value sample over time, used to compute price trend / momentum."""
+
+    __tablename__ = "price_snapshots"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    card_id: Mapped[str] = mapped_column(String(128), index=True)
+    condition_key: Mapped[str] = mapped_column(String(32))
+    median: Mapped[float] = mapped_column(Float)
+    captured_at: Mapped[datetime] = mapped_column(default=_utcnow, index=True)

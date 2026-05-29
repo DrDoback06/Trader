@@ -40,6 +40,7 @@ def deal_to_dict(deal: Deal) -> dict[str, Any]:
             round(deal.annualised_roi, 4) if deal.annualised_roi is not None else None
         ),
         "max_bid": money_to_dict(deal.max_bid),
+        "trend_pct": round(deal.trend_pct, 4) if deal.trend_pct is not None else None,
         "grading": None
         if deal.grading is None
         else {
