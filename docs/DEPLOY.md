@@ -35,13 +35,6 @@ Netlify can host the **dashboard**, but you still need the backend on Render/Rai
 
 This is more moving parts than Option A — only pick it if you specifically want Netlify.
 
-## Keys
-
-Set as environment variables on the host (persist across redeploys) **or** type them
-into the in-app **Sources & Keys** page (stored on the server, masked when read):
-`EBAY_CLIENT_ID`, `EBAY_CLIENT_SECRET`, `EBAY_ENV` (`sandbox`|`production`),
-`RAPIDAPI_KEY`, optional `POKEMONTCG_API_KEY`.
-
 ## Relisting (eBay Sell API) — list cards you own
 
 Auto-relist uses eBay's **Inventory API** to list your **own** cards on your **own**
