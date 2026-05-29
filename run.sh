@@ -14,8 +14,8 @@ echo "→ [1/3] Python environment"
 if [ ! -d .venv ]; then
   "$PY" -m venv .venv
 fi
-.venv/bin/pip install -q --upgrade pip
-.venv/bin/pip install -q -e ".[dev]"
+.venv/bin/pip install -q --timeout 120 --retries 10 --upgrade pip
+.venv/bin/pip install -q --timeout 120 --retries 10 -e ".[dev]"
 
 if [ "${1:-}" = "--catalogue" ]; then
   echo "→ importing full Pokémon catalogue (pokemontcg.io must be reachable)"

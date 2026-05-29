@@ -26,8 +26,8 @@ if not exist ".venv\Scripts\python.exe" (
     pause
     exit /b 1
 )
-".venv\Scripts\python.exe" -m pip install --upgrade pip
-".venv\Scripts\python.exe" -m pip install -e ".[dev]"
+".venv\Scripts\python.exe" -m pip install --timeout 120 --retries 10 --upgrade pip
+".venv\Scripts\python.exe" -m pip install --timeout 120 --retries 10 -e ".[dev]"
 if errorlevel 1 (
     echo.
     echo  ERROR installing Python packages - see the message above.
