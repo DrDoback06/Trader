@@ -17,17 +17,20 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from .api import alerts as alerts_api
 from .api import deals as deals_api
 from .api import health as health_api
 from .api import scan as scan_api
 from .api import settings as settings_api
 from .api import sources as sources_api
 from .config import get_settings
+from .db.base import init_db, make_engine, session_factory
 from .providers.factory import configure_app_providers
 from .services.credentials import CredentialStore
 from .services.demo import build_demo_deals, load_catalogue
 from .services.pipeline import PipelineConfig
 from .services.quota import DailyQuota
+from .services.scheduler import start_scheduler
 from .services.sources import DEFAULT_ENABLED
 from .services.watchlist import default_watchlist
 
@@ -67,6 +70,9 @@ def create_app() -> FastAPI:
     app.state.credentials = CredentialStore.create(
         settings, DEFAULT_ENABLED, path=Path(settings.credentials_path)
     )
+    engine = make_engine(settings.database_url)
+    init_db(engine)
+    app.state.session_maker = session_factory(engine)
     # Selects live eBay-UK sold prices when configured, else the offline fixture.
     configure_app_providers(app)
     # Start with demo deals so the dashboard has content before the first live scan.
@@ -89,6 +95,10 @@ def create_app() -> FastAPI:
     app.include_router(settings_api.router)
     app.include_router(scan_api.router)
     app.include_router(sources_api.router)
+    app.include_router(alerts_api.router)
+
+    # Periodically scour + alert when SCAN_INTERVAL_MIN > 0 and eBay is configured.
+    app.state.scheduler = start_scheduler(app)
 
     # Serve the built dashboard from the same process, if it's been built.
     dist = Path(__file__).resolve().parents[2] / "frontend" / "dist"

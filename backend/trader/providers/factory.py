@@ -12,7 +12,9 @@ from ..config import Settings
 from ..services.credentials import CredentialStore
 from ..services.demo import load_sold_provider
 from ..services.valuation import CachingSoldPriceProvider
-from .base import SoldPriceProvider
+from .alert_console import ConsoleAlertChannel
+from .alert_telegram import TelegramAlertChannel
+from .base import AlertChannel, SoldPriceProvider
 from .ebay_browse import EbayBrowseSource
 from .ebay_oauth import EbayOAuth
 from .soldprice_rapidapi import RapidApiSoldPriceProvider
@@ -54,6 +56,17 @@ def build_sold_provider(
         )
         return CachingSoldPriceProvider(inner, ttl_hours=settings.valuation_ttl_hours)
     return load_sold_provider()
+
+
+def build_alert_channel(settings: Settings) -> AlertChannel:
+    """Telegram when configured, else the console channel."""
+    if (
+        settings.alert_channel == "telegram"
+        and settings.telegram_bot_token
+        and settings.telegram_chat_id
+    ):
+        return TelegramAlertChannel(settings.telegram_bot_token, settings.telegram_chat_id)
+    return ConsoleAlertChannel()
 
 
 def configure_app_providers(app: Any) -> None:

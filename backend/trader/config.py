@@ -19,7 +19,13 @@ class Settings(BaseSettings):
     # Phase 1
     total_budget_gbp: float = 300.0
     soldprice_provider: str = "fixture"
-    alert_channel: str = "console"
+
+    # Phase 4 — persistence + alerts + scheduled auto-scans
+    database_url: str = "sqlite:///./trader.db"
+    scan_interval_min: int = 0  # 0 = no auto-scan; e.g. 10 = scan every 10 min
+    alert_channel: str = "console"  # console | telegram
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
 
     # Phase 2 — eBay Browse (live UK listing scanning)
     ebay_client_id: str = ""

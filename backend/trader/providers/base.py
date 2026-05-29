@@ -41,6 +41,8 @@ class SoldPriceProvider(Protocol):
 class AlertChannel(Protocol):
     """A way to notify the user of a deal (console, Telegram — Phase 4)."""
 
+    name: str
+
     def send(self, deal: Deal) -> None: ...
 
 

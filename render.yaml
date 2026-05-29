@@ -25,3 +25,12 @@ services:
         sync: false
       - key: POKEMONTCG_API_KEY
         sync: false
+      # Auto-scan + Telegram alerts (Wave 1 #1). 0 = off; e.g. 10 = every 10 min.
+      - key: SCAN_INTERVAL_MIN
+        value: "0"
+      - key: ALERT_CHANNEL
+        value: console
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false

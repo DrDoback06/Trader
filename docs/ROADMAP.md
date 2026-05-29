@@ -37,11 +37,18 @@ dashboard renders them. **Done.**
 - ✅ `providers/factory.py` selects the live provider when configured + enabled, else the fixture.
 - **To go live:** add your RapidAPI key under **Sources & Keys** in the UI (~£10–40/mo).
 
-## Phase 4 — Alerting + persistence hardening ⏳
-- `providers/alert_telegram.py` with an inline buy button; idempotent `Alert`
-  (unique `(channel, dedup_key)`); Postgres; `Deal` lifecycle (NEW→ALERTED→DISMISSED/BOUGHT).
-- **Verify:** same deal twice ⇒ one message; SQLite→Postgres migration; deep-link correctness.
-- **Needs:** `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID`.
+## Phase 4 / Wave 1 #1 — Alerting + scheduled auto-scans + persistence ✅
+- ✅ SQLAlchemy persistence (`db/`), idempotent `AlertRow` (unique `(channel, dedup_key)`).
+- ✅ `providers/alert_telegram.py` + `services/alerts.py` (top deals, dedup); `services/scheduler.py`
+  (APScheduler) runs the "everything" scan every `SCAN_INTERVAL_MIN`; `POST /alerts/test`, `GET /alerts`.
+- ✅ Verified end-to-end (mocked): same deal twice ⇒ exactly one Telegram message.
+- ⏳ **Later:** Alembic migrations + Postgres in prod; `Deal` lifecycle (NEW→ALERTED→DISMISSED/BOUGHT);
+  inline buy button.
+- **To enable:** set `SCAN_INTERVAL_MIN>0`, `ALERT_CHANNEL=telegram`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
+
+## Wave 1 also delivered
+- #2 annualised-ROI + sold-velocity ranking; #4 low-/no-bid auction data + max-bid solver;
+  #7 Best-Offer/auction acquisition pricing. (See git history.)
 
 ## Phase 5 — Portfolio / positions / ledger (limit & stop-loss) ⏳
 - `Position` from "mark bought"; `LedgerEntry`; realized/unrealized P&L; `services/portfolio.py`
