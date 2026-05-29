@@ -7,15 +7,16 @@ Economics, confidence, scoring, rules, catalogue, identifier — all unit-tested
 disabled. Pipeline runs offline on bundled sample data. FastAPI serves ranked demo deals; React
 dashboard renders them. **Done.**
 
-## Phase 2 — Live eBay Browse scanning (quota-aware) ⏳
-- `providers/ebay_oauth.py` + `providers/ebay_browse.py` — OAuth client-credentials,
-  `X-EBAY-C-MARKETPLACE-ID: EBAY_GB`, `item_summary/search` (set `buyingOptions` for auctions).
-- `services/quota.py` (≤ ~5,000 calls/day budget) + `services/scanner.py` over a prioritized
-  `WatchTarget` list; `services/dedup.py` (listing fingerprint).
-- Persist `Listing` / `ScanJob` (SQLAlchemy + Alembic, SQLite→Postgres). APScheduler scan job.
-- **Verify:** `respx` tests vs recorded fixtures; eBay **sandbox** smoke; `calls_used ≤ budget`;
-  re-scan creates no duplicates.
-- **Needs:** eBay developer keys (`EBAY_CLIENT_ID/SECRET`) + GB trading-card category ids.
+## Phase 2 — Live eBay Browse scanning (quota-aware) ✅ (in-memory)
+- ✅ `providers/ebay_oauth.py` (cached client-credentials token) + `providers/ebay_browse.py`
+  (`X-EBAY-C-MARKETPLACE-ID: EBAY_GB`, `item_summary/search`, explicit `buyingOptions`, GB filters).
+- ✅ `services/quota.py` (≤ ~5,000 calls/day budget) + `services/scanner.py` over a prioritized
+  `WatchTarget` list; `services/dedup.py` (id + title/seller/price fingerprint).
+- ✅ `POST /scan`, `GET /watchlist`, `GET /quota`; `respx` integration tests (request shape,
+  token caching, dedup, quota stop) + sandbox base-URL switch via `EBAY_ENV`.
+- ⏳ **Deferred to Phase 4:** persisting `Listing` / `ScanJob` (SQLAlchemy + Alembic) and a
+  scheduled (APScheduler) recurring scan — currently a single on-demand in-memory scan.
+- **To go live:** set `EBAY_CLIENT_ID/SECRET` (+ `EBAY_ENV`) and GB trading-card category ids.
 
 ## Phase 3 — Live sold-price valuation ⏳
 - `providers/soldprice_rapidapi.py` (`findCompletedItems`, `site_id=3` UK, outlier removal),

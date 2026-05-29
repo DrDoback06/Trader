@@ -37,7 +37,8 @@ python3 -m venv .venv
 ```
 
 Key endpoints: `GET /deals`, `GET /deals?only_passing=true`, `GET /deals/{id}`,
-`GET/PUT /settings` (edit buy rules and re-rank live), `GET /health`.
+`GET/PUT /settings` (edit buy rules and re-rank live), `GET /health`,
+`GET /watchlist`, `GET /quota`, and `POST /scan` (live eBay UK scan — needs eBay keys).
 
 ### Frontend
 
@@ -66,6 +67,17 @@ wrong-language, mis-identified, and overpriced listings are correctly filtered o
 - **Pipeline + providers**: swappable provider interfaces with offline fixture implementations,
   so the engine runs end-to-end without keys.
 - **FastAPI** app serving ranked deals + a **React/TypeScript dashboard**.
+
+## What's built (Phase 2 ✅ — live eBay UK scanning)
+
+- **eBay Browse client** (`providers/ebay_browse.py` + `ebay_oauth.py`): OAuth client-credentials
+  with token caching, `EBAY_GB` marketplace, `item_summary/search` with UK/price/buying-option
+  filters, mapped to the same `ListingFacts` the engine already understands.
+- **Quota-aware scanner** (`services/scanner.py` + `quota.py` + `dedup.py`): runs a prioritized
+  `WatchTarget` list within a daily call budget, de-duplicates, and feeds the pipeline.
+- **`POST /scan`** runs it live when eBay keys are set (`EBAY_CLIENT_ID/SECRET`, `EBAY_ENV`);
+  without keys it returns a clear message. Sandbox-first via `EBAY_ENV=sandbox`.
+- Valuation is still the offline fixture provider until **Phase 3** swaps in live UK sold prices.
 
 See [`docs/ROADMAP.md`](docs/ROADMAP.md) for Phases 2–6 (live scanning, valuation, alerts,
 portfolio, reselling) and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the design.

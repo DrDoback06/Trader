@@ -18,6 +18,19 @@ class Settings(BaseSettings):
     soldprice_provider: str = "fixture"
     alert_channel: str = "console"
 
+    # Phase 2 — eBay Browse (live UK listing scanning)
+    ebay_client_id: str = ""
+    ebay_client_secret: str = ""
+    ebay_env: str = "sandbox"  # sandbox | production
+    ebay_marketplace_id: str = "EBAY_GB"
+    ebay_oauth_base: str = "https://api.ebay.com/identity/v1/oauth2/token"
+    ebay_browse_base: str = "https://api.ebay.com/buy/browse/v1"
+    ebay_daily_call_budget: int = 4500
+
+    @property
+    def ebay_configured(self) -> bool:
+        return bool(self.ebay_client_id and self.ebay_client_secret)
+
 
 @lru_cache
 def get_settings() -> Settings:

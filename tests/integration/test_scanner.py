@@ -1,0 +1,68 @@
+from __future__ import annotations
+
+from typing import Any
+
+import httpx
+import respx
+
+from trader.core.models import WatchTarget
+from trader.providers.ebay_browse import EbayBrowseSource
+from trader.providers.ebay_oauth import EbayOAuth
+from trader.services.quota import DailyQuota
+from trader.services.scanner import scan
+
+OAUTH = "https://api.ebay.com/identity/v1/oauth2/token"
+BROWSE = "https://api.ebay.com/buy/browse/v1"
+
+
+def _item(
+    item_id: str, title: str = "Pokemon 151 Charizard ex 199/165 Near Mint"
+) -> dict[str, Any]:
+    return {
+        "itemId": item_id,
+        "title": title,
+        "price": {"value": "45.00", "currency": "GBP"},
+        "buyingOptions": ["FIXED_PRICE"],
+        "condition": "Used",
+        "seller": {"username": "shop"},
+        "itemLocation": {"country": "GB"},
+        "categories": [{"categoryId": "183454"}],
+        "itemWebUrl": f"https://www.ebay.co.uk/itm/{item_id}",
+    }
+
+
+@respx.mock
+def test_scan_dedups_and_produces_deals(catalogue: Any, sold_provider: Any) -> None:
+    respx.post(OAUTH).mock(
+        return_value=httpx.Response(200, json={"access_token": "T", "expires_in": 7200})
+    )
+    # Same item returned twice => the duplicate must be dropped.
+    respx.get(f"{BROWSE}/item_summary/search").mock(
+        return_value=httpx.Response(200, json={"itemSummaries": [_item("A"), _item("A")]})
+    )
+    src = EbayBrowseSource(EbayOAuth("id", "sec", OAUTH), BROWSE)
+    targets = [WatchTarget(query="charizard 199/165", category_ids=("183454",))]
+
+    result = scan(targets, src, catalogue, sold_provider, quota=DailyQuota(10))
+
+    assert result.calls_used == 1
+    assert result.listings_seen == 2
+    assert result.new_listings == 1
+    assert any(d.passed_rules for d in result.deals)
+
+
+@respx.mock
+def test_scan_stops_at_quota(catalogue: Any, sold_provider: Any) -> None:
+    respx.post(OAUTH).mock(
+        return_value=httpx.Response(200, json={"access_token": "T", "expires_in": 7200})
+    )
+    respx.get(f"{BROWSE}/item_summary/search").mock(
+        return_value=httpx.Response(200, json={"itemSummaries": []})
+    )
+    src = EbayBrowseSource(EbayOAuth("id", "sec", OAUTH), BROWSE)
+    targets = [WatchTarget(query="a", priority=5), WatchTarget(query="b", priority=1)]
+
+    result = scan(targets, src, catalogue, sold_provider, quota=DailyQuota(1))
+
+    assert result.calls_used == 1  # budget of 1 stops after the first target
+    assert result.quota_exhausted is True

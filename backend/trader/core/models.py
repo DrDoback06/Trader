@@ -81,6 +81,22 @@ class ParsedListing:
 
 
 @dataclass
+class WatchTarget:
+    """A search the scanner runs against a listing source. Higher priority =
+    scanned first when the daily call budget is tight."""
+
+    query: str
+    game: Game = Game.POKEMON
+    category_ids: tuple[str, ...] = ()
+    buying_options: tuple[str, ...] = ("FIXED_PRICE",)
+    max_price: float | None = None
+    condition_ids: tuple[str, ...] = ()
+    priority: int = 1
+    limit: int = 50
+    enabled: bool = True
+
+
+@dataclass
 class ListingFacts:
     """Normalised facts about a single marketplace listing (engine input)."""
 

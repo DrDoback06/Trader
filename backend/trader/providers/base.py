@@ -12,7 +12,18 @@ from ..core.models import Card, Deal, ListingFacts, Valuation
 class ListingSource(Protocol):
     """A source of active listings to evaluate (e.g. eBay Browse — Phase 2)."""
 
-    def fetch(self, *, query: str, limit: int = 50) -> Sequence[ListingFacts]: ...
+    def fetch(
+        self,
+        *,
+        query: str,
+        limit: int = 50,
+        category_ids: Sequence[str] | None = None,
+        buying_options: Sequence[str] = ("FIXED_PRICE",),
+        max_price: float | None = None,
+        condition_ids: Sequence[str] | None = None,
+        item_location_country: str = "GB",
+        sort: str | None = "newlyListed",
+    ) -> Sequence[ListingFacts]: ...
 
 
 @runtime_checkable

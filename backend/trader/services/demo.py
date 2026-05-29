@@ -13,8 +13,14 @@ from .pipeline import PipelineConfig, run_pipeline
 _PKG_ROOT = Path(__file__).resolve().parent.parent  # .../trader
 
 
+def load_catalogue() -> Catalogue:
+    return Catalogue.from_dir(_PKG_ROOT / "catalogue_data")
+
+
+def load_sold_provider() -> FixtureSoldPriceProvider:
+    return FixtureSoldPriceProvider.from_file(_PKG_ROOT / "sample_data" / "sold_prices.json")
+
+
 def build_demo_deals(cfg: PipelineConfig | None = None) -> list[Deal]:
-    catalogue = Catalogue.from_dir(_PKG_ROOT / "catalogue_data")
-    sold = FixtureSoldPriceProvider.from_file(_PKG_ROOT / "sample_data" / "sold_prices.json")
     listings = load_listings(_PKG_ROOT / "sample_data" / "demo_listings.json")
-    return run_pipeline(listings, catalogue, sold, cfg)
+    return run_pipeline(listings, load_catalogue(), load_sold_provider(), cfg)
