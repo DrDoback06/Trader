@@ -99,10 +99,16 @@ def portfolio_summary(session_maker: sessionmaker) -> dict[str, Any]:
             {
                 "id": r.id,
                 "card": r.card_name,
+                "card_name": r.card_name,
+                "number": r.number,
+                "set_name": r.set_name or "Unknown set",
+                "grade": r.grade,
+                "condition": r.condition or "",
                 "cost_basis": round(r.cost_basis, 2),
                 "est_value": round(r.est_value, 2),
                 "status": r.status,
                 "sold_price": r.sold_price,
+                "listing_id": r.listing_id,
                 "url": r.url,
             }
         )

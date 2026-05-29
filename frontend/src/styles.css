@@ -546,6 +546,23 @@ table.srctable {
   font-size: 13px;
 }
 
+/* nested holdings (Set -> Card -> copies) */
+.holdings .setrow td {
+  background: var(--panel-2);
+  font-weight: 700;
+}
+
+.holdings .cardrow td {
+  color: var(--muted);
+  font-weight: 600;
+  padding-left: 22px;
+}
+
+.holdings td.variant {
+  padding-left: 34px;
+  font-weight: 600;
+}
+
 .auction {
   margin-top: 3px;
   color: #e7c454;

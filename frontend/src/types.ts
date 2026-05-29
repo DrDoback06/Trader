@@ -79,10 +79,16 @@ export interface Allocation {
 export interface Position {
   id: number;
   card: string;
+  card_name: string;
+  number: string;
+  set_name: string;
+  grade: string;
+  condition: string;
   cost_basis: number;
   est_value: number;
   status: string;
   sold_price: number | null;
+  listing_id: string;
   url: string;
 }
 

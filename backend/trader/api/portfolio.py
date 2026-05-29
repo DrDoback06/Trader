@@ -47,6 +47,8 @@ def buy(request: Request, body: BuyIn) -> dict[str, Any]:
     deal = next(
         (d for d in request.app.state.deals if d.listing.external_id == body.deal_id), None
     )
+    if deal is None:
+        deal = getattr(request.app.state, "recent_evals", {}).get(body.deal_id)
     if deal is None or deal.economics is None:
         raise HTTPException(status_code=404, detail="deal not found or not priced")
     position_id = buy_from_deal(request.app.state.session_maker, deal)

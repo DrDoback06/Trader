@@ -78,6 +78,8 @@ def create_app() -> FastAPI:
     configure_app_providers(app)
     # Start with demo deals so the dashboard has content before the first live scan.
     app.state.deals = build_demo_deals(app.state.pipeline_cfg)
+    # Recent "Check a card" evaluations, so those can be added to the portfolio too.
+    app.state.recent_evals = {}
 
     @app.middleware("http")
     async def require_password(request: Request, call_next):

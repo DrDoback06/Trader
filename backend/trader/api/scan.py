@@ -170,4 +170,11 @@ def evaluate_card(request: Request, body: EvaluateIn) -> dict[str, Any]:
             status_code=502, detail=f"Couldn't reach the sold-price service: {exc}"
         ) from exc
 
+    # Remember it so '📌 Bought' can add this checked card to the portfolio.
+    evals = getattr(request.app.state, "recent_evals", None)
+    if evals is not None:
+        if len(evals) > 100:
+            evals.clear()
+        evals[listing.external_id] = deal
+
     return deal_to_dict(deal)
