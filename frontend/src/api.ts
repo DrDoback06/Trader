@@ -1,11 +1,51 @@
-import type { Deal } from "./types";
+import type { Deal, ScanResult, SourcesResponse, SourceState } from "./types";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
 
-export async function fetchDeals(onlyPassing: boolean): Promise<Deal[]> {
-  const res = await fetch(`${API_BASE}/deals?only_passing=${onlyPassing}`);
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: { "Content-Type": "application/json" },
+    ...init,
+  });
   if (!res.ok) {
-    throw new Error(`API error ${res.status}`);
+    let detail = `API error ${res.status}`;
+    try {
+      const body = await res.json();
+      if (body && typeof body.detail === "string") {
+        detail = body.detail;
+      }
+    } catch {
+      // non-JSON error body; keep the default message
+    }
+    throw new Error(detail);
   }
-  return (await res.json()) as Deal[];
+  return (await res.json()) as T;
+}
+
+export function fetchDeals(onlyPassing: boolean): Promise<Deal[]> {
+  return request<Deal[]>(`/deals?only_passing=${onlyPassing}`);
+}
+
+export function fetchSources(): Promise<SourcesResponse> {
+  return request<SourcesResponse>("/sources");
+}
+
+export function updateCredentials(
+  values: Record<string, string>,
+): Promise<SourcesResponse> {
+  return request<SourcesResponse>("/sources/credentials", {
+    method: "PUT",
+    body: JSON.stringify(values),
+  });
+}
+
+export function setSourceEnabled(id: string, enabled: boolean): Promise<SourceState> {
+  return request<SourceState>(`/sources/${id}`, {
+    method: "PUT",
+    body: JSON.stringify({ enabled }),
+  });
+}
+
+export function runScan(): Promise<ScanResult> {
+  return request<ScanResult>("/scan", { method: "POST" });
 }

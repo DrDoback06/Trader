@@ -77,7 +77,18 @@ wrong-language, mis-identified, and overpriced listings are correctly filtered o
   `WatchTarget` list within a daily call budget, de-duplicates, and feeds the pipeline.
 - **`POST /scan`** runs it live when eBay keys are set (`EBAY_CLIENT_ID/SECRET`, `EBAY_ENV`);
   without keys it returns a clear message. Sandbox-first via `EBAY_ENV=sandbox`.
-- Valuation is still the offline fixture provider until **Phase 3** swaps in live UK sold prices.
+## What's built (Phase 3 ✅ — live UK valuation + in-UI keys)
+
+- **Live eBay-UK sold prices** (`providers/soldprice_rapidapi.py`): real avg/median UK sold
+  values via a swappable `SoldPriceProvider`, behind a **cache-first** wrapper (`valuation.py`) so
+  a repeat lookup costs nothing.
+- **Sources & Keys page**: paste your API keys in the UI (with "where to get this" links), and
+  tick which price sources to use. Only sources we trust for the **UK** can be enabled —
+  **eBay UK sold** (value) and **eBay UK active** (discovery). **Cardmarket** (EU, API closed) and
+  **PriceCharting** (US, USD) are shown for transparency but can't be turned on, since EU/US prices
+  would mislead a UK strategy. Keys are stored locally (gitignored, masked on read), applied
+  instantly — no restart.
+- A **Run live eBay scan** button on the Deals page kicks off a real scan once keys are set.
 
 See [`docs/ROADMAP.md`](docs/ROADMAP.md) for Phases 2–6 (live scanning, valuation, alerts,
 portfolio, reselling) and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the design.

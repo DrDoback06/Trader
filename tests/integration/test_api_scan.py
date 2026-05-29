@@ -13,7 +13,7 @@ def test_scan_requires_credentials() -> None:
     client = TestClient(app)
     resp = client.post("/scan")
     assert resp.status_code == 400
-    assert "EBAY_CLIENT_ID" in resp.json()["detail"]
+    assert "Active listings" in resp.json()["detail"]
 
 
 def test_watchlist_and_quota_endpoints() -> None:

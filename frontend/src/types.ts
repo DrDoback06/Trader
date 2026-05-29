@@ -41,6 +41,36 @@ export interface Listing {
   image_url: string | null;
 }
 
+export interface SourceState {
+  id: string;
+  name: string;
+  role: string;
+  region: string;
+  currency: string;
+  requires: string[];
+  signup_url: string;
+  accuracy: string;
+  available: boolean;
+  configured: boolean;
+  enabled: boolean;
+  active: boolean;
+}
+
+export interface SourcesResponse {
+  sources: SourceState[];
+  credentials: Record<string, string | null>;
+  note: string;
+}
+
+export interface ScanResult {
+  targets_scanned: number;
+  calls_used: number;
+  listings_seen: number;
+  new_listings: number;
+  quota_exhausted: boolean;
+  deals: Deal[];
+}
+
 export interface Deal {
   id: string;
   source: string;

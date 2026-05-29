@@ -11,9 +11,10 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Any
 
+import httpx
 from fastapi import APIRouter, HTTPException, Request
 
-from ..providers.ebay_factory import build_browse_source
+from ..providers.factory import build_browse_source
 from ..services.scanner import scan
 from .serialize import deal_to_dict
 
@@ -33,24 +34,32 @@ def get_quota(request: Request) -> dict[str, Any]:
 
 @router.post("/scan")
 def run_scan(request: Request) -> dict[str, Any]:
-    source = build_browse_source(request.app.state.settings)
+    source = build_browse_source(request.app.state.credentials, request.app.state.settings)
     if source is None:
         raise HTTPException(
             status_code=400,
             detail=(
-                "eBay scanning is not configured. Set EBAY_CLIENT_ID and "
-                "EBAY_CLIENT_SECRET (and EBAY_ENV) to enable live scanning."
+                "Live eBay UK scanning isn't ready. Enable the 'eBay UK — Active listings' "
+                "source and add your eBay API keys under Settings → Sources."
             ),
         )
 
-    result = scan(
-        request.app.state.watchlist,
-        source,
-        request.app.state.catalogue,
-        request.app.state.sold_provider,
-        quota=request.app.state.quota,
-        cfg=request.app.state.pipeline_cfg,
-    )
+    try:
+        result = scan(
+            request.app.state.watchlist,
+            source,
+            request.app.state.catalogue,
+            request.app.state.sold_provider,
+            quota=request.app.state.quota,
+            cfg=request.app.state.pipeline_cfg,
+        )
+    except httpx.HTTPStatusError as exc:
+        detail = "eBay rejected the request"
+        if exc.response.status_code in (401, 403):
+            detail = "eBay rejected your credentials (401/403). Check your keys and EBAY_ENV."
+        raise HTTPException(status_code=502, detail=detail) from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"Could not reach eBay: {exc}") from exc
     # Cache the freshly scanned deals so GET /deals reflects the live scan.
     request.app.state.deals = result.deals
     return {

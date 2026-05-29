@@ -18,12 +18,16 @@ dashboard renders them. **Done.**
   scheduled (APScheduler) recurring scan — currently a single on-demand in-memory scan.
 - **To go live:** set `EBAY_CLIENT_ID/SECRET` (+ `EBAY_ENV`) and GB trading-card category ids.
 
-## Phase 3 — Live sold-price valuation ⏳
-- `providers/soldprice_rapidapi.py` (`findCompletedItems`, `site_id=3` UK, outlier removal),
-  `services/valuation.py` cache-first with TTL; confidence fed by real sample size / spread.
-- **Verify:** integration tests on recorded fixtures; cache-hit path makes zero HTTP calls;
-  spot-check medians vs manual eBay sold search.
-- **Needs:** a sold-price provider key (`RAPIDAPI_KEY`), ~£10–40/mo.
+## Phase 3 — Live sold-price valuation ✅
+- ✅ `providers/soldprice_rapidapi.py` (`findCompletedItems`, `site_id=3` UK, outlier exclusion,
+  graded-grade keywords) + `services/valuation.py` cache-first wrapper with TTL (cache hit = zero
+  HTTP calls). Confidence + sell-through fed by the real sample size / spread.
+- ✅ **In-UI key entry + source registry:** `GET/PUT /sources` lets you paste keys (applied at
+  runtime, stored in gitignored `.trader/credentials.json`, masked on read) and toggle sources.
+  Only UK-accurate sources are usable (eBay UK sold + active); Cardmarket (EU, API closed) and
+  PriceCharting (US) are listed but cannot be enabled.
+- ✅ `providers/factory.py` selects the live provider when configured + enabled, else the fixture.
+- **To go live:** add your RapidAPI key under **Sources & Keys** in the UI (~£10–40/mo).
 
 ## Phase 4 — Alerting + persistence hardening ⏳
 - `providers/alert_telegram.py` with an inline buy button; idempotent `Alert`

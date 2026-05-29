@@ -27,6 +27,16 @@ class Settings(BaseSettings):
     ebay_browse_base: str = "https://api.ebay.com/buy/browse/v1"
     ebay_daily_call_budget: int = 4500
 
+    # Phase 3 — sold-price valuation (eBay UK sold)
+    rapidapi_key: str = ""
+    rapidapi_soldprice_host: str = "ebay-average-selling-price.p.rapidapi.com"
+    soldprice_site_id: str = "3"  # 3 = eBay UK (GBP)
+    valuation_ttl_hours: int = 72
+    pricecharting_api_key: str = ""
+
+    # Where UI-entered keys are persisted (local, gitignored, plaintext).
+    credentials_path: str = ".trader/credentials.json"
+
     @property
     def ebay_configured(self) -> bool:
         return bool(self.ebay_client_id and self.ebay_client_secret)
