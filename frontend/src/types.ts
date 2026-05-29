@@ -94,6 +94,11 @@ export interface Portfolio {
   realised_pnl: number;
 }
 
+export interface RelistPreview {
+  preview: { sku: string; title: string; description: string; condition: string; price: Money; grade: string };
+  note: string;
+}
+
 export interface ScanResult {
   mode: string;
   targets_scanned: number;

@@ -21,10 +21,20 @@ def buy_from_deal(session_maker: sessionmaker, deal: Deal) -> int:
     if deal.economics is None:
         raise ValueError("deal has no economics")
     card = deal.identification.card
+    ident = deal.identification
+    grade = ""
+    if ident.is_graded and ident.grade_company is not None and ident.grade_value is not None:
+        gv = int(ident.grade_value) if float(ident.grade_value).is_integer() else ident.grade_value
+        grade = f"{ident.grade_company.value} {gv}"
     with session_maker() as session:
         row = PositionRow(
             card_id=card.id if card else deal.id,
             card_name=card.name if card else "(unknown)",
+            number=card.number if card else "",
+            set_name=card.set_name if card else "",
+            grade=grade,
+            condition=ident.condition_bucket.value,
+            image_url=deal.listing.image_url or "",
             cost_basis=deal.economics.buy_cost.as_float,
             est_value=deal.economics.resale_gross.as_float,
             url=deal.listing.url or "",
@@ -32,6 +42,35 @@ def buy_from_deal(session_maker: sessionmaker, deal: Deal) -> int:
         session.add(row)
         session.commit()
         return row.id
+
+
+def get_position(session_maker: sessionmaker, position_id: int) -> dict[str, Any] | None:
+    with session_maker() as session:
+        row = session.get(PositionRow, position_id)
+        if row is None:
+            return None
+        return {
+            "id": row.id,
+            "card_name": row.card_name,
+            "number": row.number,
+            "set_name": row.set_name,
+            "grade": row.grade,
+            "condition": row.condition or "RAW_NM",
+            "est_value": row.est_value,
+            "status": row.status,
+            "image_url": row.image_url,
+        }
+
+
+def mark_listed(session_maker: sessionmaker, position_id: int, listing_id: str) -> bool:
+    with session_maker() as session:
+        row = session.get(PositionRow, position_id)
+        if row is None:
+            return False
+        row.status = "LISTED"
+        row.listing_id = listing_id
+        session.commit()
+        return True
 
 
 def mark_sold(session_maker: sessionmaker, position_id: int, price: float) -> bool:

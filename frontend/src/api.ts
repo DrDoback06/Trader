@@ -2,6 +2,7 @@ import type {
   Allocation,
   Deal,
   Portfolio,
+  RelistPreview,
   ScanResult,
   SourcesResponse,
   SourceState,
@@ -79,5 +80,12 @@ export function sellPosition(id: number, price: number): Promise<Portfolio> {
   return request<Portfolio>(`/portfolio/${id}/sell`, {
     method: "POST",
     body: JSON.stringify({ price }),
+  });
+}
+
+export function relistPreview(id: number): Promise<RelistPreview> {
+  return request<RelistPreview>(`/portfolio/${id}/relist`, {
+    method: "POST",
+    body: JSON.stringify({ publish: false }),
   });
 }

@@ -62,13 +62,17 @@ dashboard renders them. **Done.**
 - #10 vision card ID from photos (`providers/vision_claude.py`, Claude API, `[vision]` extra) —
   reads the card off the image then re-matches the catalogue; opt-in via the `vision` source.
 
-## Phase 6 — Reselling automation (seam only) 🔒
-Future `SellExecutor` over eBay Sell Inventory/Trading to auto-list/reprice. The `BuyExecutor`
-stays a no-op. Position/Ledger/limit/stop-loss fields are the forward-compatible seam.
-
-## Phase 6 — Reselling automation (seam only) 🔒
-Future `SellExecutor` over eBay Sell Inventory/Trading to auto-list/reprice. The `BuyExecutor`
-stays a no-op. Position/Ledger/limit/stop-loss fields are the forward-compatible seam.
+## Phase 6 — Reselling automation ✅ (compliant, preview-first)
+- `services/relist.py` builds an accurate listing draft (honest title/condition/description;
+  never reuses the source photos); `providers/ebay_sell.py` lists via the eBay **Inventory API**
+  (createOrReplaceInventoryItem → createOffer → publishOffer) on the seller's own account.
+- `POST /portfolio/{id}/relist` is **preview-first**: returns a draft; publishes only with
+  `publish=true` + your own `image_urls` + configured seller token/policies. Dashboard "Relist"
+  button shows the draft. Buying stays manual (`BuyExecutor` no-op) — only selling is automated.
+- **To enable:** `EBAY_USER_TOKEN` (sell.inventory scope) + business-policy IDs + location key;
+  see `docs/DEPLOY.md` → Relisting.
+- ⏳ **Later:** in-app OAuth refresh flow; auto-reprice / relist-on-buy toggle; offer-exists (409)
+  → updateOffer.
 
 ## Cross-cutting backlog
 - AMBIGUOUS review queue in the dashboard (cheap accuracy gains, feeds catalogue corrections).

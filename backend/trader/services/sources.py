@@ -62,6 +62,18 @@ SOURCES: list[SourceInfo] = [
         default_enabled=False,
     ),
     SourceInfo(
+        id="relist",
+        name="eBay relist (Sell API)",
+        role="Sell",
+        region="UK",
+        currency="GBP",
+        requires=("ebay_user_token",),
+        signup_url="https://developer.ebay.com/api-docs/sell/static/inventory/inventory-item-to-offer.html",
+        accuracy="Lists cards you own via eBay's Sell API — your account, your photos.",
+        available=True,
+        default_enabled=False,
+    ),
+    SourceInfo(
         id="cardmarket",
         name="Cardmarket (Europe)",
         role="Market value",

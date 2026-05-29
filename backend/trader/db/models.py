@@ -48,10 +48,16 @@ class PositionRow(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     card_id: Mapped[str] = mapped_column(String(128), index=True)
     card_name: Mapped[str] = mapped_column(String(256), default="")
+    number: Mapped[str] = mapped_column(String(32), default="")
+    set_name: Mapped[str] = mapped_column(String(128), default="")
+    grade: Mapped[str] = mapped_column(String(32), default="")  # e.g. "PSA 9", "" if raw
+    condition: Mapped[str] = mapped_column(String(16), default="")  # RAW_NM, GRADED, ...
+    image_url: Mapped[str] = mapped_column(String(512), default="")
     cost_basis: Mapped[float] = mapped_column(Float)  # what you paid (buy cost)
     est_value: Mapped[float] = mapped_column(Float)  # market value at purchase
-    status: Mapped[str] = mapped_column(String(16), default="HELD")  # HELD | SOLD
+    status: Mapped[str] = mapped_column(String(16), default="HELD")  # HELD | SOLD | LISTED
     sold_price: Mapped[float | None] = mapped_column(Float, default=None)
+    listing_id: Mapped[str] = mapped_column(String(64), default="")  # eBay listing id once relisted
     url: Mapped[str] = mapped_column(String(512), default="")
     acquired_at: Mapped[datetime] = mapped_column(default=_utcnow)
     sold_at: Mapped[datetime | None] = mapped_column(default=None)

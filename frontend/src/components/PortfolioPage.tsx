@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { buyDeal, fetchAllocation, fetchPortfolio, sellPosition } from "../api";
+import { buyDeal, fetchAllocation, fetchPortfolio, relistPreview, sellPosition } from "../api";
 import type { Allocation, Portfolio } from "../types";
 import { DealsTable } from "./DealsTable";
 
@@ -32,6 +32,15 @@ export function PortfolioPage() {
       loadPf();
     } catch (e: unknown) {
       setMsg(e instanceof Error ? e.message : "could not add");
+    }
+  };
+
+  const onRelist = async (id: number) => {
+    try {
+      const r = await relistPreview(id);
+      setMsg(`Relist draft → "${r.preview.title}" @ ${r.preview.price.display}. ${r.note}`);
+    } catch (e: unknown) {
+      setMsg(e instanceof Error ? e.message : "could not build relist draft");
     }
   };
 
@@ -136,11 +145,16 @@ export function PortfolioPage() {
                         {p.status}
                       </span>
                     </td>
-                    <td>
+                    <td className="actions">
                       {p.status === "HELD" && (
-                        <button className="bought" onClick={() => onSell(p.id)}>
-                          Mark sold
-                        </button>
+                        <>
+                          <button className="bought" onClick={() => onRelist(p.id)}>
+                            Relist
+                          </button>
+                          <button className="bought" onClick={() => onSell(p.id)}>
+                            Mark sold
+                          </button>
+                        </>
                       )}
                     </td>
                   </tr>

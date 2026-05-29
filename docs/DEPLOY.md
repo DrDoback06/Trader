@@ -42,6 +42,35 @@ into the in-app **Sources & Keys** page (stored on the server, masked when read)
 `EBAY_CLIENT_ID`, `EBAY_CLIENT_SECRET`, `EBAY_ENV` (`sandbox`|`production`),
 `RAPIDAPI_KEY`, optional `POKEMONTCG_API_KEY`.
 
+## Relisting (eBay Sell API) — list cards you own
+
+Auto-relist uses eBay's **Inventory API** to list your **own** cards on your **own**
+account — the sanctioned listing path (createOrReplaceInventoryItem → createOffer →
+publishOffer). It is **preview-first**: `POST /portfolio/{id}/relist` returns a draft;
+it only publishes when you send `publish=true` **and** your own `image_urls`.
+
+To enable it you need a one-time eBay seller setup:
+1. A **user OAuth token** with the `sell.inventory` scope (authorization-code grant) →
+   `EBAY_USER_TOKEN`, and enable the **"eBay relist (Sell API)"** source.
+2. Business **policies** (payment, return, fulfillment) and an **inventory location**,
+   created once in your eBay account → `EBAY_FULFILLMENT_POLICY_ID`,
+   `EBAY_PAYMENT_POLICY_ID`, `EBAY_RETURN_POLICY_ID`, `EBAY_MERCHANT_LOCATION_KEY`.
+3. Optional: `RELIST_MARKUP` (list price = est. value × markup), `EBAY_RELIST_CATEGORY_ID`.
+
+**Staying within eBay's T&Cs:** list only cards you actually own; use **your own
+photos** (the app never reuses the source listing's images); keep titles/conditions
+**accurate** (the draft carries the real grade/condition); as a business reseller you'll
+be a **business seller** (returns + consumer-rights obligations) and the income is
+**taxable** (HMRC trading income). Buying stays manual — only selling is automated.
+
+## Keys
+
+Set as environment variables on the host (persist across redeploys) **or** type them
+into the in-app **Sources & Keys** page (stored on the server, masked when read):
+`EBAY_CLIENT_ID`, `EBAY_CLIENT_SECRET`, `EBAY_ENV` (`sandbox`|`production`),
+`RAPIDAPI_KEY`, optional `POKEMONTCG_API_KEY`, optional `ANTHROPIC_API_KEY` (photo ID),
+and (for relisting) `EBAY_USER_TOKEN` + the policy/location IDs above.
+
 ## ⚠️ Security
 
 A public URL means anyone who finds it can use the app and spend your eBay/RapidAPI

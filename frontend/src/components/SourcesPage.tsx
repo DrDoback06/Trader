@@ -24,6 +24,11 @@ const KEY_FIELDS: { key: string; label: string; help: string }[] = [
     label: "Claude API key — photo card ID (optional)",
     help: "https://console.anthropic.com/",
   },
+  {
+    key: "ebay_user_token",
+    label: "eBay seller token — relisting (optional)",
+    help: "https://developer.ebay.com/api-docs/static/oauth-scopes.html",
+  },
 ];
 
 export function SourcesPage() {

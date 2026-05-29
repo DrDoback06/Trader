@@ -47,6 +47,15 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     anthropic_vision_model: str = "claude-opus-4-8"
 
+    # Phase 6 — relist (eBay Sell API). User-OAuth token + business policies.
+    ebay_sell_base: str = "https://api.ebay.com/sell/inventory/v1"
+    ebay_relist_category_id: str = "183454"  # Pokémon Individual Cards (GB)
+    relist_markup: float = 1.0  # list price = est. value × markup
+    ebay_fulfillment_policy_id: str = ""
+    ebay_payment_policy_id: str = ""
+    ebay_return_policy_id: str = ""
+    ebay_merchant_location_key: str = ""
+
     # Where UI-entered keys are persisted (local, gitignored, plaintext).
     credentials_path: str = ".trader/credentials.json"
 

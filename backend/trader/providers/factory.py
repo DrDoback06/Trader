@@ -17,11 +17,30 @@ from .alert_telegram import TelegramAlertChannel
 from .base import AlertChannel, SoldPriceProvider, VisionIdentifier
 from .ebay_browse import EbayBrowseSource
 from .ebay_oauth import EbayOAuth
+from .ebay_sell import EbaySellClient, SellConfig
 from .soldprice_rapidapi import RapidApiSoldPriceProvider
 from .vision_claude import ClaudeVisionIdentifier
 
 _SANDBOX_OAUTH = "https://api.sandbox.ebay.com/identity/v1/oauth2/token"
 _SANDBOX_BROWSE = "https://api.sandbox.ebay.com/buy/browse/v1"
+_SANDBOX_SELL = "https://api.sandbox.ebay.com/sell/inventory/v1"
+
+
+def build_sell_client(
+    credentials: CredentialStore, settings: Settings
+) -> EbaySellClient | None:
+    """eBay Sell client for relisting, or None if not enabled/keyed."""
+    if not (credentials.is_enabled("relist") and credentials.is_configured("ebay_user_token")):
+        return None
+    base = _SANDBOX_SELL if settings.ebay_env == "sandbox" else settings.ebay_sell_base
+    config = SellConfig(
+        marketplace_id=settings.ebay_marketplace_id,
+        fulfillment_policy_id=settings.ebay_fulfillment_policy_id,
+        payment_policy_id=settings.ebay_payment_policy_id,
+        return_policy_id=settings.ebay_return_policy_id,
+        merchant_location_key=settings.ebay_merchant_location_key,
+    )
+    return EbaySellClient(credentials.get("ebay_user_token"), base, config)
 
 
 def _bases(settings: Settings) -> tuple[str, str]:
