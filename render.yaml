@@ -1,0 +1,24 @@
+# Render Blueprint — one web service serving the API + dashboard from the Dockerfile.
+# Deploy: render.com → New → Blueprint → connect this repo → pick this branch → Apply.
+services:
+  - type: web
+    name: trader
+    runtime: docker
+    plan: free
+    branch: claude/vibrant-faraday-HuOEu
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: EBAY_ENV
+        value: production
+      # Set these in the Render dashboard (kept out of git). You can also enter
+      # them later in the app's "Sources & Keys" page instead.
+      - key: EBAY_CLIENT_ID
+        sync: false
+      - key: EBAY_CLIENT_SECRET
+        sync: false
+      - key: RAPIDAPI_KEY
+        sync: false
+      - key: POKEMONTCG_API_KEY
+        sync: false
