@@ -83,6 +83,34 @@ def test_sweep_paginates_within_quota(catalogue: Any, sold_provider: Any) -> Non
 
 
 @respx.mock
+def test_scan_values_only_cheapest_when_capped(catalogue: Any, sold_provider: Any) -> None:
+    respx.post(OAUTH).mock(
+        return_value=httpx.Response(200, json={"access_token": "T", "expires_in": 7200})
+    )
+
+    def priced(item_id: str, value: str) -> dict[str, Any]:
+        it = _item(item_id)
+        it["price"] = {"value": value, "currency": "GBP"}
+        return it
+
+    priced_items = [("A", "50"), ("B", "40"), ("C", "30"), ("D", "20"), ("E", "10")]
+    items = [priced(i, v) for i, v in priced_items]
+    respx.get(f"{BROWSE}/item_summary/search").mock(
+        return_value=httpx.Response(200, json={"itemSummaries": items})
+    )
+    src = EbayBrowseSource(EbayOAuth("id", "sec", OAUTH), BROWSE)
+    targets = [WatchTarget(query="charizard 199/165", category_ids=("183454",))]
+
+    result = scan(targets, src, catalogue, sold_provider, quota=DailyQuota(10), max_valuations=3)
+
+    assert result.new_listings == 5
+    assert result.valued == 3
+    assert result.unvalued == 2
+    # Only the three cheapest were valued (priced into deals).
+    assert sorted(float(d.listing.price.amount) for d in result.deals) == [10.0, 20.0, 30.0]
+
+
+@respx.mock
 def test_scan_stops_at_quota(catalogue: Any, sold_provider: Any) -> None:
     respx.post(OAUTH).mock(
         return_value=httpx.Response(200, json={"access_token": "T", "expires_in": 7200})

@@ -41,6 +41,8 @@ class Settings(BaseSettings):
     rapidapi_soldprice_host: str = "ebay-average-selling-price.p.rapidapi.com"
     soldprice_site_id: str = "3"  # 3 = eBay UK (GBP)
     valuation_ttl_hours: int = 72
+    # Cost guard: value only the cheapest N new listings per scan (0 = value all).
+    max_valuations_per_scan: int = 250
     pricecharting_api_key: str = ""
 
     # Wave 3 #10 — vision card ID (Claude API)

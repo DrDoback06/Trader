@@ -12,7 +12,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from ..core.models import Deal, ListingFacts, ScanMode, WatchTarget
+from ..core.models import BuyingFormat, Deal, ListingFacts, ScanMode, WatchTarget
 from ..identify.catalogue import Catalogue
 from ..providers.base import ListingSource, SoldPriceProvider
 from .dedup import Dedup
@@ -26,6 +26,8 @@ class ScanResult:
     calls_used: int = 0
     listings_seen: int = 0
     new_listings: int = 0
+    valued: int = 0
+    unvalued: int = 0
     quota_exhausted: bool = False
     deals: list[Deal] = field(default_factory=list)
 
@@ -60,6 +62,17 @@ def _fetch_kwargs(target: WatchTarget) -> dict[str, Any]:
     }
 
 
+def _ask_key(listing: ListingFacts) -> float:
+    """What you'd pay now (current bid for auctions, else price) + postage."""
+    base = (
+        listing.current_bid_price
+        if listing.buying_format is BuyingFormat.AUCTION and listing.current_bid_price is not None
+        else listing.price
+    )
+    ship = float(listing.shipping.amount) if listing.shipping is not None else 0.0
+    return float(base.amount) + ship
+
+
 def scan(
     targets: Sequence[WatchTarget],
     source: ListingSource,
@@ -69,6 +82,7 @@ def scan(
     quota: DailyQuota,
     dedup: Dedup | None = None,
     cfg: PipelineConfig | None = None,
+    max_valuations: int = 0,
 ) -> ScanResult:
     cfg = cfg or PipelineConfig()
     dedup = dedup or Dedup()
@@ -104,5 +118,12 @@ def scan(
             break
 
     result.new_listings = len(new_listings)
-    result.deals = run_pipeline(new_listings, catalogue, sold_provider, cfg)
+    # Cost guard: value only the cheapest N new listings (the likeliest steals); the
+    # rest wait for a later scan (each valuation caches once fetched, so this is cheap).
+    to_value = new_listings
+    if max_valuations and len(to_value) > max_valuations:
+        to_value = sorted(to_value, key=_ask_key)[:max_valuations]
+    result.valued = len(to_value)
+    result.unvalued = len(new_listings) - len(to_value)
+    result.deals = run_pipeline(to_value, catalogue, sold_provider, cfg)
     return result

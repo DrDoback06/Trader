@@ -96,6 +96,7 @@ def run_scan(request: Request, body: ScanRequest | None = None) -> dict[str, Any
             request.app.state.sold_provider,
             quota=request.app.state.quota,
             cfg=cfg,
+            max_valuations=request.app.state.settings.max_valuations_per_scan,
         )
     except httpx.HTTPStatusError as exc:
         detail = "eBay rejected the request"
@@ -116,6 +117,8 @@ def run_scan(request: Request, body: ScanRequest | None = None) -> dict[str, Any
         "calls_used": result.calls_used,
         "listings_seen": result.listings_seen,
         "new_listings": result.new_listings,
+        "valued": result.valued,
+        "unvalued": result.unvalued,
         "quota_exhausted": result.quota_exhausted,
         "deals": [deal_to_dict(d) for d in result.deals],
     }

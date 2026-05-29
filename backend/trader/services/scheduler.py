@@ -34,6 +34,7 @@ def run_scan_cycle(app: Any) -> int:
         app.state.sold_provider,
         quota=app.state.quota,
         cfg=app.state.pipeline_cfg,
+        max_valuations=app.state.settings.max_valuations_per_scan,
     )
     attach_trends(app.state.session_maker, result.deals)
     record_snapshots(app.state.session_maker, result.deals)
