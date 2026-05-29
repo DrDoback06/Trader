@@ -57,6 +57,10 @@ export function DealsTable({ deals }: { deals: Deal[] }) {
           const profitPos = e ? e.profit.amount >= 0 : false;
           const isAuction = d.listing.buying_format === "AUCTION";
           const ends = endsIn(d.listing.item_end_date);
+          const askMoney =
+            isAuction && d.listing.current_bid_price
+              ? d.listing.current_bid_price
+              : d.listing.price;
           return (
             <tr key={d.id} className={d.passed_rules ? "pass" : "skip"}>
               <td className="num">{i + 1}</td>
@@ -67,7 +71,19 @@ export function DealsTable({ deals }: { deals: Deal[] }) {
                 </div>
                 <div className="sub">{d.card ? d.card.set_name : d.listing.title}</div>
                 {isAuction && (
-                  <div className="auction">⏳ Auction{ends ? ` · ends in ${ends}` : ""}</div>
+                  <div className="auction">
+                    ⏳ Auction
+                    {d.listing.bid_count != null
+                      ? ` · ${d.listing.bid_count} bid${d.listing.bid_count === 1 ? "" : "s"}`
+                      : ""}
+                    {ends ? ` · ends in ${ends}` : ""}
+                    {d.max_bid ? ` · max bid ${d.max_bid.display}` : ""}
+                  </div>
+                )}
+                {!isAuction && d.listing.accepts_best_offer && (
+                  <div className="auction">
+                    💬 Offers{d.max_bid ? ` · offer up to ${d.max_bid.display}` : ""}
+                  </div>
                 )}
                 {d.flags.length > 0 && (
                   <div className="flags">
@@ -81,7 +97,7 @@ export function DealsTable({ deals }: { deals: Deal[] }) {
               </td>
               <td>{condLabel(d)}</td>
               <td className="r">
-                {d.listing.price.display}
+                {askMoney.display}
                 {d.listing.shipping && d.listing.shipping.amount > 0 ? (
                   <span className="sub"> +{d.listing.shipping.display}</span>
                 ) : null}
@@ -101,9 +117,16 @@ export function DealsTable({ deals }: { deals: Deal[] }) {
               </td>
               <td className="c">
                 {e ? (
-                  <TrafficLight tier={d.profit_tier} title="Return on investment after fees">
-                    {pct(e.roi)}
-                  </TrafficLight>
+                  <>
+                    <TrafficLight tier={d.profit_tier} title="Return on investment after fees">
+                      {pct(e.roi)}
+                    </TrafficLight>
+                    {d.annualised_roi != null && (
+                      <div className="sub" title="Annualised — ROI adjusted for how fast it sells">
+                        ≈{pct(d.annualised_roi)}/yr
+                      </div>
+                    )}
+                  </>
                 ) : (
                   "—"
                 )}
@@ -116,6 +139,11 @@ export function DealsTable({ deals }: { deals: Deal[] }) {
                 >
                   {pct(d.sell_probability)}
                 </TrafficLight>
+                {d.valuation?.days_to_sell != null && (
+                  <div className="sub" title="Estimated days to sell at market">
+                    ~{Math.round(d.valuation.days_to_sell)}d
+                  </div>
+                )}
               </td>
               <td className="c">
                 <ConfidenceBadge value={d.confidence} />
