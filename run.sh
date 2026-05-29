@@ -14,8 +14,13 @@ echo "→ [1/3] Python environment"
 if [ ! -d .venv ]; then
   "$PY" -m venv .venv
 fi
-.venv/bin/pip install -q --timeout 120 --retries 10 --upgrade pip
-.venv/bin/pip install -q --timeout 120 --retries 10 -e ".[dev]"
+# Skip the (network) install if the app + key libraries already import.
+if .venv/bin/python -c "import trader, sqlalchemy, apscheduler, fastapi, uvicorn" 2>/dev/null; then
+  echo "  packages already installed - skipping download"
+else
+  .venv/bin/pip install -q --timeout 120 --retries 10 --upgrade pip
+  .venv/bin/pip install -q --timeout 120 --retries 10 -e ".[dev]"
+fi
 
 if [ "${1:-}" = "--catalogue" ]; then
   echo "→ importing full Pokémon catalogue (pokemontcg.io must be reachable)"
