@@ -18,7 +18,11 @@ from pydantic import BaseModel
 from ..core.models import WatchTarget
 from ..providers.factory import build_browse_source
 from ..services.scanner import scan
-from ..services.watchlist import cheapest_sweep_target, ending_soon_sweep_target
+from ..services.watchlist import (
+    cheapest_sweep_target,
+    ending_soon_sweep_target,
+    hidden_gem_targets,
+)
 from .serialize import deal_to_dict
 
 router = APIRouter(tags=["scan"])
@@ -41,6 +45,7 @@ def _targets_for(request: Request, body: ScanRequest) -> list[WatchTarget]:
         "watchlist": watchlist,
         "cheapest": [cheapest],
         "ending_soon": [ending],
+        "hidden_gems": hidden_gem_targets(max_price=body.max_price),
         "everything": [*watchlist, cheapest, ending],
     }.get(body.mode, watchlist)
 

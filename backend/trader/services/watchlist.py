@@ -7,6 +7,7 @@ In a later phase these are user-managed and persisted; for now they seed the
 from __future__ import annotations
 
 from ..core.models import Game, ScanMode, WatchTarget
+from .typos import hidden_gem_queries
 
 # eBay GB "Pokémon Individual Cards" leaf category.
 POKEMON_SINGLES_GB = "183454"
@@ -47,6 +48,26 @@ def ending_soon_sweep_target(
         limit=limit,
         priority=4,
     )
+
+
+def hidden_gem_targets(
+    *, category_ids: tuple[str, ...] = (POKEMON_SINGLES_GB,), max_price: float | None = None,
+    limit: int = 50,
+) -> list[WatchTarget]:
+    """Search misspelled / vague queries for high-value cards competitors miss."""
+    return [
+        WatchTarget(
+            query=q,
+            game=Game.POKEMON,
+            category_ids=category_ids,
+            buying_options=("FIXED_PRICE", "BEST_OFFER"),
+            sort="newlyListed",
+            max_price=max_price,
+            limit=limit,
+            priority=2,
+        )
+        for q in hidden_gem_queries()
+    ]
 
 
 def default_watchlist() -> list[WatchTarget]:
