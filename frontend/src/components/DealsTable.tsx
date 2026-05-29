@@ -1,5 +1,6 @@
 import type { Deal } from "../types";
 import { ConfidenceBadge } from "./ConfidenceBadge";
+import { TrafficLight } from "./TrafficLight";
 
 function pct(x: number): string {
   return `${Math.round(x * 100)}%`;
@@ -26,8 +27,10 @@ export function DealsTable({ deals }: { deals: Deal[] }) {
           <th className="r">Ask</th>
           <th className="r">Est. value</th>
           <th className="r">Profit</th>
-          <th className="r">ROI</th>
-          <th className="c">Conf.</th>
+          <th className="c">ROI</th>
+          <th className="c">Disc.</th>
+          <th className="c">Sell-through</th>
+          <th className="c">Match</th>
           <th className="c">Status</th>
           <th></th>
         </tr>
@@ -75,8 +78,23 @@ export function DealsTable({ deals }: { deals: Deal[] }) {
               <td className={`r ${e ? (profitPos ? "pos" : "neg") : ""}`}>
                 {e ? e.profit.display : "—"}
               </td>
-              <td className={`r ${e ? (e.roi >= 0 ? "pos" : "neg") : ""}`}>
-                {e ? pct(e.roi) : "—"}
+              <td className="c">
+                {e ? (
+                  <TrafficLight tier={d.profit_tier} title="Return on investment after fees">
+                    {pct(e.roi)}
+                  </TrafficLight>
+                ) : (
+                  "—"
+                )}
+              </td>
+              <td className="c sub">{d.discount != null ? pct(d.discount) : "—"}</td>
+              <td className="c">
+                <TrafficLight
+                  tier={d.sell_tier}
+                  title="Rough chance it sells near market value (liquidity + price stability)"
+                >
+                  {pct(d.sell_probability)}
+                </TrafficLight>
               </td>
               <td className="c">
                 <ConfidenceBadge value={d.confidence} />

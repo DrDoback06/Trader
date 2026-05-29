@@ -145,6 +145,7 @@ class Deal:
     valuation: Valuation | None = None
     economics: EconomicsResult | None = None
     confidence: float = 0.0
+    sell_probability: float = 0.0
     score: float = 0.0
     passed_rules: bool = False
     rule_reasons: list[str] = field(default_factory=list)

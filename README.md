@@ -59,6 +59,10 @@ wrong-language, mis-identified, and overpriced listings are correctly filtered o
 - **Identifier** (`backend/trader/identify/`): parses titles/specifics → set, number, finish,
   language, grade; matches to a card **catalogue**; flags proxies/lots/damage; emits a match
   confidence. Conservative by design — it would rather miss a deal than buy a dud.
+- **Triage indicators** (`core/rating.py`): a **traffic-light profit tier** (GREEN/AMBER/RED by
+  ROI) shown alongside the ROI%, a **market-discount %**, and a **sell-through probability**
+  (liquidity + price stability) with its own traffic light — so high-margin-but-illiquid cards
+  are visibly distinguished from quick, reliable flips. Sell-through also factors into ranking.
 - **Pipeline + providers**: swappable provider interfaces with offline fixture implementations,
   so the engine runs end-to-end without keys.
 - **FastAPI** app serving ranked deals + a **React/TypeScript dashboard**.

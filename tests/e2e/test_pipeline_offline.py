@@ -3,6 +3,7 @@ entirely offline (no API keys, no network)."""
 
 from __future__ import annotations
 
+from trader.core.rating import Tier, profit_tier
 from trader.core.rules import RuleSet
 from trader.services.demo import build_demo_deals
 
@@ -42,6 +43,18 @@ def test_overpriced_excluded_by_cap_and_profit() -> None:
     deals = build_demo_deals()
     reasons = "; ".join(_by_id(deals, "1008").rule_reasons)
     assert "per-card cap" in reasons
+
+
+def test_indicators_present_and_sensible() -> None:
+    deals = build_demo_deals()
+    cz = _by_id(deals, "1001")  # Charizard ex, ~49% ROI
+    assert cz.economics is not None
+    assert profit_tier(cz.economics.roi) is Tier.GREEN
+    assert 0.0 <= cz.sell_probability <= 1.0
+    # The PSA 10 Pikachu is high-margin but lower-liquidity than the Charizard,
+    # so its sell-through probability must be lower.
+    pk = _by_id(deals, "1003")
+    assert pk.sell_probability < cz.sell_probability
 
 
 def test_no_passing_deal_has_excluded_flags_or_low_confidence() -> None:

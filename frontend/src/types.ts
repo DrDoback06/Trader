@@ -47,6 +47,10 @@ export interface Deal {
   passed_rules: boolean;
   score: number;
   confidence: number;
+  sell_probability: number;
+  sell_tier: string;
+  profit_tier: string;
+  discount: number | null;
   decision: string;
   match_score: number;
   card: CardRef | null;

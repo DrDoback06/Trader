@@ -25,6 +25,9 @@ def _econ(profit: float, roi: float) -> EconomicsResult:
 def test_deal_score_is_risk_adjusted_profit() -> None:
     assert deal_score(_econ(10, 1.0), 0.5) == 5.0
     assert deal_score(_econ(10, 1.0), 1.0) == 10.0
+    # sell-through probability further discounts the score
+    assert deal_score(_econ(10, 1.0), 1.0, 0.5) == 5.0
+    assert deal_score(_econ(10, 1.0), 0.5, 0.5) == 2.5
 
 
 def test_rank_passing_first_then_score_then_roi(make_deal: Callable[..., Deal]) -> None:

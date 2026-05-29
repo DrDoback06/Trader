@@ -32,6 +32,7 @@ class RuleSet:
     min_roi: float = 0.25
     min_margin: float = 0.15
     min_confidence: float = 0.55
+    min_sell_probability: float = 0.0  # off by default; raise to filter illiquid cards
     # --- eligibility ---
     graded_policy: GradedPolicy = GradedPolicy.ALLOW
     language_whitelist: tuple[str, ...] = ("English",)
@@ -88,5 +89,10 @@ def evaluate(
         reasons.append(f"margin {econ.margin:.0%} below minimum {rules.min_margin:.0%}")
     if deal.confidence < rules.min_confidence:
         reasons.append(f"confidence {deal.confidence:.2f} below minimum {rules.min_confidence:.2f}")
+    if deal.sell_probability < rules.min_sell_probability:
+        reasons.append(
+            f"sell-through {deal.sell_probability:.0%} below minimum "
+            f"{rules.min_sell_probability:.0%}"
+        )
 
     return (len(reasons) == 0, reasons)

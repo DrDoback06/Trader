@@ -36,11 +36,12 @@ export default function App() {
 
   const stats = useMemo(() => {
     const passing = deals.filter((d) => d.passed_rules);
+    const green = passing.filter((d) => d.profit_tier === "GREEN").length;
     const potential = passing.reduce(
       (sum, d) => sum + (d.economics ? d.economics.profit.amount : 0),
       0,
     );
-    return { evaluated: deals.length, passing: passing.length, potential };
+    return { evaluated: deals.length, passing: passing.length, green, potential };
   }, [deals]);
 
   return (
@@ -61,6 +62,10 @@ export default function App() {
         <div className="stat">
           <span className="figure">{stats.passing}</span>
           <span className="label">deals worth buying</span>
+        </div>
+        <div className="stat">
+          <span className="figure green-fig">{stats.green}</span>
+          <span className="label">green-light (high profit)</span>
         </div>
         <div className="stat">
           <span className="figure pos">£{stats.potential.toFixed(2)}</span>

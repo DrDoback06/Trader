@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 from ..core.confidence import ConfidenceConfig, compute_confidence
 from ..core.economics import FeeProfile, compute_economics
 from ..core.models import Deal, Decision, Game, ListingFacts
+from ..core.rating import RatingConfig
+from ..core.rating import sell_probability as compute_sell_probability
 from ..core.rules import RuleSet, evaluate
 from ..core.scoring import deal_score, rank_deals
 from ..identify.catalogue import Catalogue
@@ -26,6 +28,7 @@ class PipelineConfig:
     rules: RuleSet = field(default_factory=RuleSet)
     matcher: MatcherConfig = field(default_factory=MatcherConfig)
     confidence: ConfidenceConfig = field(default_factory=ConfidenceConfig)
+    rating: RatingConfig = field(default_factory=RatingConfig)
     game: Game = Game.POKEMON
 
 
@@ -66,7 +69,13 @@ def evaluate_listing(
         soft_flags=soft_flags,
         cfg=cfg.confidence,
     )
-    deal.score = deal_score(deal.economics, deal.confidence)
+    deal.sell_probability = compute_sell_probability(
+        valuation.sample_size,
+        valuation.spread,
+        target_ratio=cfg.rules.default_limit_markup,
+        cfg=cfg.rating,
+    )
+    deal.score = deal_score(deal.economics, deal.confidence, deal.sell_probability)
 
     passed, reasons = evaluate(deal, cfg.rules)
     deal.passed_rules = passed

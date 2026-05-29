@@ -64,9 +64,19 @@ h1 {
 
 .stats {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 14px;
   margin: 22px 0;
+}
+
+@media (max-width: 720px) {
+  .stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.green-fig {
+  color: var(--pos);
 }
 
 .stat {
@@ -189,6 +199,31 @@ table.deals {
 }
 
 .neg {
+  color: var(--neg);
+}
+
+.tl {
+  display: inline-block;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  min-width: 44px;
+  text-align: center;
+}
+
+.tl-GREEN {
+  background: #143a2a;
+  color: var(--pos);
+}
+
+.tl-AMBER {
+  background: #3a3414;
+  color: #e7c454;
+}
+
+.tl-RED {
+  background: #3a1e1e;
   color: var(--neg);
 }
 
