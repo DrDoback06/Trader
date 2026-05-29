@@ -34,6 +34,7 @@ class RuleSet:
     min_confidence: float = 0.55
     min_sell_probability: float = 0.0  # off by default; raise to filter illiquid cards
     min_annualised_roi: float = 0.0  # off by default; raise to demand fast capital turnover
+    min_discount: float = 0.0  # off by default; require buying this far below market
     # --- eligibility ---
     graded_policy: GradedPolicy = GradedPolicy.ALLOW
     language_whitelist: tuple[str, ...] = ("English",)
@@ -43,6 +44,22 @@ class RuleSet:
     default_limit_markup: float = 1.0  # target resale = est_value × markup
     stop_loss_pct: float = 0.80  # floor = cost basis × this fraction
     max_days_held: int = 30
+
+    @classmethod
+    def for_holds(cls) -> RuleSet:
+        """Tuned for long-term graded holds: liquidity/velocity gates off, lower ROI
+        bar, but require a real discount to the current graded-market price. Surfaces
+        deals across all grades (1/7/8/9 holds and 10 flips alike)."""
+        return cls(
+            max_spend_per_card=Money(Decimal("150"), "GBP"),
+            min_roi=0.10,
+            min_margin=0.05,
+            min_confidence=0.5,
+            min_sell_probability=0.0,
+            min_annualised_roi=0.0,
+            min_discount=0.12,
+            graded_policy=GradedPolicy.GRADED_ONLY,
+        )
 
 
 def evaluate(
@@ -106,5 +123,7 @@ def evaluate(
             f"annualised ROI {deal.annualised_roi:.0%} below minimum "
             f"{rules.min_annualised_roi:.0%}"
         )
+    if rules.min_discount > 0 and deal.discount is not None and deal.discount < rules.min_discount:
+        reasons.append(f"discount {deal.discount:.0%} below minimum {rules.min_discount:.0%}")
 
     return (len(reasons) == 0, reasons)

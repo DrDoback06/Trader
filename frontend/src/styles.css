@@ -504,6 +504,13 @@ table.srctable {
   font-weight: 700;
 }
 
+.hold {
+  margin-top: 3px;
+  color: #7cc7ff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .trend {
   margin-top: 3px;
   font-size: 12px;

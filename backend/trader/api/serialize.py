@@ -35,7 +35,10 @@ def deal_to_dict(deal: Deal) -> dict[str, Any]:
         "sell_probability": round(deal.sell_probability, 3),
         "sell_tier": sell_tier(deal.sell_probability).value,
         "profit_tier": profit_tier(econ.roi).value if econ else "RED",
-        "discount": round(discount_vs_market(econ), 4) if econ else None,
+        "discount": round(deal.discount, 4)
+        if deal.discount is not None
+        else (round(discount_vs_market(econ), 4) if econ else None),
+        "hold_candidate": deal.hold_candidate,
         "annualised_roi": (
             round(deal.annualised_roi, 4) if deal.annualised_roi is not None else None
         ),

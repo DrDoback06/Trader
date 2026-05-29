@@ -18,7 +18,7 @@ from ..core.economics import (
     max_bid_for_target,
 )
 from ..core.models import BuyingFormat, Card, Deal, Game, ListingFacts, ParsedListing
-from ..core.rating import RatingConfig, annualised_roi
+from ..core.rating import RatingConfig, annualised_roi, discount_vs_market
 from ..core.rating import sell_probability as compute_sell_probability
 from ..core.rules import RuleSet, evaluate
 from ..core.scoring import deal_score, rank_deals
@@ -149,6 +149,12 @@ def evaluate_listing(
         cfg=cfg.rating,
     )
     deal.annualised_roi = annualised_roi(deal.economics.roi, valuation.days_to_sell)
+    deal.discount = discount_vs_market(deal.economics)
+    deal.hold_candidate = (
+        ident.is_graded
+        and (ident.grade_value or 10) < 10
+        and deal.discount >= 0.10
+    )
 
     # Grade-and-flip: for a raw card, is it worth grading and selling as a slab?
     if cfg.evaluate_grading and not ident.is_graded:

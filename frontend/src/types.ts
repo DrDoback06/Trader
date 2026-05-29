@@ -122,6 +122,7 @@ export interface Deal {
   sell_tier: string;
   profit_tier: string;
   discount: number | null;
+  hold_candidate: boolean;
   annualised_roi: number | null;
   max_bid: Money | null;
   grading: Grading | null;

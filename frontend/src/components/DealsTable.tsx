@@ -96,6 +96,11 @@ export function DealsTable({
                     🔼 Grade → +{d.grading.expected_profit.display} ({pct(d.grading.expected_roi)} EV)
                   </div>
                 )}
+                {d.hold_candidate && (
+                  <div className="hold" title="Graded slab below market — long-term hold candidate">
+                    💎 Hold{d.discount != null ? ` · ${pct(d.discount)} below market` : ""}
+                  </div>
+                )}
                 {d.trend_pct != null && Math.abs(d.trend_pct) >= 0.05 && (
                   <div
                     className={d.trend_pct > 0 ? "trend up" : "trend down"}

@@ -50,15 +50,21 @@ def ending_soon_sweep_target(
     )
 
 
+# Grades worth sweeping: 10 for flips, 7/8/9 for value holds, 1 for cheap oddity holds.
+DEFAULT_GRADERS: tuple[str, ...] = ("PSA", "CGC")
+DEFAULT_GRADES: tuple[int, ...] = (10, 9, 8, 7, 1)
+
+
 def graded_sweep_targets(
-    *, category_ids: tuple[str, ...] = (POKEMON_SINGLES_GB,), max_price: float | None = None,
+    *, graders: tuple[str, ...] = DEFAULT_GRADERS, grades: tuple[int, ...] = DEFAULT_GRADES,
+    category_ids: tuple[str, ...] = (POKEMON_SINGLES_GB,), max_price: float | None = None,
     limit: int = 100,
 ) -> list[WatchTarget]:
-    """Sweep for slabbed cards (PSA/CGC) — valued against graded sold prices."""
-    queries = ("pokemon psa 10", "pokemon cgc 10", "pokemon charizard psa 10", "pokemon psa 9")
+    """Sweep slabbed cards across graders × grades — each valued against its own
+    grade's sold prices. The whole-grade sweep covers every card, not just grails."""
     return [
         WatchTarget(
-            query=q,
+            query=f"pokemon {grader} {grade}",
             game=Game.POKEMON,
             category_ids=category_ids,
             buying_options=("FIXED_PRICE", "BEST_OFFER", "AUCTION"),
@@ -67,7 +73,8 @@ def graded_sweep_targets(
             limit=limit,
             priority=3,
         )
-        for q in queries
+        for grader in graders
+        for grade in grades
     ]
 
 

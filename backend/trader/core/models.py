@@ -195,6 +195,8 @@ class Deal:
     confidence: float = 0.0
     sell_probability: float = 0.0
     annualised_roi: float | None = None
+    discount: float | None = None  # fraction below market you're buying at
+    hold_candidate: bool = False  # graded sub-10 slab bought below market (long-term hold)
     max_bid: Money | None = None  # most to pay (bid/offer) and still hit targets
     grading: GradingResult | None = None  # raw -> slab grade-and-flip economics
     trend_pct: float | None = None  # market-value momentum vs recent history

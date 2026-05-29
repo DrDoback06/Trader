@@ -16,6 +16,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from ..core.models import WatchTarget
+from ..core.rules import RuleSet
 from ..providers.factory import build_browse_source
 from ..services.scanner import scan
 from ..services.trends import attach_trends, record_snapshots
@@ -82,6 +83,8 @@ def run_scan(request: Request, body: ScanRequest | None = None) -> dict[str, Any
     cfg = request.app.state.pipeline_cfg
     if body.mode == "sealed":
         cfg = replace(cfg, catalogue_free=True)  # value sealed product by title
+    elif body.mode == "graded":
+        cfg = replace(cfg, rules=RuleSet.for_holds())  # surface holds across all grades
 
     try:
         result = scan(
