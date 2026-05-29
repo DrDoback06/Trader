@@ -78,6 +78,14 @@ export interface ScanResult {
   deals: Deal[];
 }
 
+export interface Grading {
+  graded_value: Money;
+  expected_profit: Money;
+  expected_roi: number;
+  gem_rate: number;
+  worth_grading: boolean;
+}
+
 export interface Deal {
   id: string;
   source: string;
@@ -90,6 +98,7 @@ export interface Deal {
   discount: number | null;
   annualised_roi: number | null;
   max_bid: Money | null;
+  grading: Grading | null;
   decision: string;
   match_score: number;
   card: CardRef | null;

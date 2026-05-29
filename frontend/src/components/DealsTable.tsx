@@ -85,6 +85,11 @@ export function DealsTable({ deals }: { deals: Deal[] }) {
                     💬 Offers{d.max_bid ? ` · offer up to ${d.max_bid.display}` : ""}
                   </div>
                 )}
+                {d.grading?.worth_grading && (
+                  <div className="grade" title="Buy raw, grade it, sell the slab (expected value)">
+                    🔼 Grade → +{d.grading.expected_profit.display} ({pct(d.grading.expected_roi)} EV)
+                  </div>
+                )}
                 {d.flags.length > 0 && (
                   <div className="flags">
                     {d.flags.map((f) => (

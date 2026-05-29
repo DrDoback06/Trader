@@ -496,3 +496,10 @@ table.srctable {
   font-size: 12px;
   font-weight: 600;
 }
+
+.grade {
+  margin-top: 3px;
+  color: var(--pos);
+  font-size: 12px;
+  font-weight: 700;
+}

@@ -165,3 +165,75 @@ def max_bid_for_target(
         max_bid = Decimal("0")
     # Round DOWN: the max bid must never exceed the safe ceiling.
     return Money(max_bid.quantize(Decimal("0.01"), rounding=ROUND_DOWN), currency)
+
+
+@dataclass(frozen=True)
+class GradingProfile:
+    """Cost + odds of grading a raw card. ``company``/``target_grade`` pick which
+    graded sold-price bucket to value against (e.g. PSA 10)."""
+
+    name: str
+    company: str = "PSA"
+    target_grade: str = "10"
+    grading_cost: Money = Money(Decimal("36"), "GBP")  # practical UK cost (≈ CGC modern)
+    ship_to_grader: Money = Money(Decimal("4"), "GBP")
+    gem_rate: float = 0.45  # P(hits the target grade) — conservative default
+    min_graded_value: Money = Money(Decimal("45"), "GBP")  # not worth grading below this
+
+    @classmethod
+    def default_uk(cls) -> GradingProfile:
+        return cls(name="UK grading (estimate)")
+
+    @property
+    def graded_key(self) -> str:
+        return f"GRADED_{self.company}_{self.target_grade}"
+
+
+@dataclass(frozen=True)
+class GradingResult:
+    graded_value: Money
+    total_cost: Money  # raw buy + grading + ship-to-grader
+    gem_rate: float
+    expected_net: Money  # P(gem) × net proceeds from selling the slab
+    expected_profit: Money
+    expected_roi: float
+    worth_grading: bool
+
+
+def compute_grading_economics(
+    *,
+    raw_buy_cost: Money,
+    graded_value: Money,
+    fee_profile: FeeProfile,
+    grading_profile: GradingProfile,
+    outbound_postage: Money | None = None,
+    packaging: Money | None = None,
+) -> GradingResult:
+    """Expected economics of buying a raw card and grading it.
+
+    Conservative: only the gem outcome is counted as upside (non-gem grades are
+    treated as a wash), so a positive result is a genuinely attractive grade-and-flip.
+    """
+    currency = graded_value.currency
+    _, outbound, pack = _resolve_costs(fee_profile, currency, None, outbound_postage, packaging)
+    _, graded_net = _selling_breakdown(graded_value.quantize(), fee_profile, outbound, pack)
+
+    expected_net = Money(graded_net.amount * Decimal(str(grading_profile.gem_rate)), currency)
+    total_cost = (
+        raw_buy_cost + grading_profile.grading_cost + grading_profile.ship_to_grader
+    ).quantize()
+    expected_profit = (expected_net - total_cost).quantize()
+    expected_roi = (
+        float(expected_profit.amount / total_cost.amount) if total_cost.amount > 0 else 0.0
+    )
+    worth = graded_value >= grading_profile.min_graded_value and expected_profit.amount > 0
+
+    return GradingResult(
+        graded_value=graded_value.quantize(),
+        total_cost=total_cost,
+        gem_rate=grading_profile.gem_rate,
+        expected_net=expected_net.quantize(),
+        expected_profit=expected_profit,
+        expected_roi=expected_roi,
+        worth_grading=worth,
+    )

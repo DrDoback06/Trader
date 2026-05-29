@@ -40,6 +40,15 @@ def deal_to_dict(deal: Deal) -> dict[str, Any]:
             round(deal.annualised_roi, 4) if deal.annualised_roi is not None else None
         ),
         "max_bid": money_to_dict(deal.max_bid),
+        "grading": None
+        if deal.grading is None
+        else {
+            "graded_value": money_to_dict(deal.grading.graded_value),
+            "expected_profit": money_to_dict(deal.grading.expected_profit),
+            "expected_roi": round(deal.grading.expected_roi, 4),
+            "gem_rate": deal.grading.gem_rate,
+            "worth_grading": deal.grading.worth_grading,
+        },
         "decision": ident.decision.value,
         "match_score": ident.match_score,
         "card": None

@@ -9,7 +9,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from ..core.confidence import ConfidenceConfig, compute_confidence
-from ..core.economics import FeeProfile, compute_economics, max_bid_for_target
+from ..core.economics import (
+    FeeProfile,
+    GradingProfile,
+    compute_economics,
+    compute_grading_economics,
+    max_bid_for_target,
+)
 from ..core.models import BuyingFormat, Deal, Decision, Game, ListingFacts
 from ..core.rating import RatingConfig, annualised_roi
 from ..core.rating import sell_probability as compute_sell_probability
@@ -29,6 +35,8 @@ class PipelineConfig:
     matcher: MatcherConfig = field(default_factory=MatcherConfig)
     confidence: ConfidenceConfig = field(default_factory=ConfidenceConfig)
     rating: RatingConfig = field(default_factory=RatingConfig)
+    grading: GradingProfile = field(default_factory=GradingProfile.default_uk)
+    evaluate_grading: bool = True
     game: Game = Game.POKEMON
 
 
@@ -92,6 +100,18 @@ def evaluate_listing(
         cfg=cfg.rating,
     )
     deal.annualised_roi = annualised_roi(deal.economics.roi, valuation.days_to_sell)
+
+    # Grade-and-flip: for a raw card, is it worth grading and selling as a slab?
+    if cfg.evaluate_grading and not ident.is_graded:
+        graded = sold_provider.get_valuation(ident.card, cfg.grading.graded_key)
+        if graded is not None:
+            deal.grading = compute_grading_economics(
+                raw_buy_cost=deal.economics.buy_cost,
+                graded_value=graded.median,
+                fee_profile=cfg.fee_profile,
+                grading_profile=cfg.grading,
+            )
+
     deal.score = deal_score(deal.economics, deal.confidence, deal.sell_probability)
 
     passed, reasons = evaluate(deal, cfg.rules)

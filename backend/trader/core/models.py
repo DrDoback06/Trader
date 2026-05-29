@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from .economics import EconomicsResult
+from .economics import EconomicsResult, GradingResult
 from .money import Money
 
 
@@ -185,6 +185,7 @@ class Deal:
     sell_probability: float = 0.0
     annualised_roi: float | None = None
     max_bid: Money | None = None  # most to pay (bid/offer) and still hit targets
+    grading: GradingResult | None = None  # raw -> slab grade-and-flip economics
     score: float = 0.0
     passed_rules: bool = False
     rule_reasons: list[str] = field(default_factory=list)
