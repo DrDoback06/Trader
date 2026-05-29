@@ -21,6 +21,9 @@ htmlcov/
 !.env.example
 .trader/
 
+# Locally imported full card catalogue (run trader.tools.import_pokemontcg)
+backend/trader/catalogue_data/imported/
+
 # ---- Node / frontend ----
 node_modules/
 frontend/dist/

@@ -20,9 +20,10 @@ dashboard renders them. **Done.**
   `{mode, ending_within_hours}`; the UI exposes mode + a 1/2/3/6/12h dropdown.
 - ⏳ **Deferred to Phase 4:** persisting `Listing` / `ScanJob` (SQLAlchemy + Alembic) and a
   scheduled (APScheduler) recurring scan — currently a single on-demand in-memory scan.
-- ⏳ **Catalogue coverage:** discovery only recognises cards in the catalogue (seed = a few sets).
-  A bigger catalogue (e.g. import from pokemontcg.io behind the `Catalogue` interface) is the next
-  unlock so a broad sweep recognises most cards.
+- ✅ **Full catalogue importer:** `python -m trader.tools.import_pokemontcg` pulls every set/card
+  from pokemontcg.io into a gitignored `catalogue_data/imported/` that the app auto-prefers. The
+  matcher uses a name-token index so it stays fast at ~20k cards. (Run locally — the API host is
+  blocked in some sandboxes.) Seed sets remain for offline demo/tests.
 - **To go live:** set `EBAY_CLIENT_ID/SECRET` (+ `EBAY_ENV`) and GB trading-card category ids.
 
 ## Phase 3 — Live sold-price valuation ✅

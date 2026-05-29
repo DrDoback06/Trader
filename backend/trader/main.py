@@ -12,6 +12,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from .api import deals as deals_api
 from .api import health as health_api
@@ -61,6 +62,12 @@ def create_app() -> FastAPI:
     app.include_router(settings_api.router)
     app.include_router(scan_api.router)
     app.include_router(sources_api.router)
+
+    # Serve the built dashboard from the same process, if it's been built.
+    dist = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+    if (dist / "index.html").exists():
+        app.mount("/", StaticFiles(directory=dist, html=True), name="frontend")
+
     return app
 
 

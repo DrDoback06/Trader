@@ -14,7 +14,11 @@ _PKG_ROOT = Path(__file__).resolve().parent.parent  # .../trader
 
 
 def load_catalogue() -> Catalogue:
-    return Catalogue.from_dir(_PKG_ROOT / "catalogue_data")
+    """Use the locally imported full catalogue if present, else the seed sets."""
+    imported = _PKG_ROOT / "catalogue_data" / "imported"
+    if imported.is_dir() and any(imported.glob("*.json")):
+        return Catalogue.from_dir(imported)
+    return Catalogue.from_dir(_PKG_ROOT / "catalogue_data" / "pokemon")
 
 
 def load_sold_provider() -> FixtureSoldPriceProvider:

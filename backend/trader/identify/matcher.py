@@ -88,7 +88,7 @@ def identify(
     if any(f in cfg.hard_flags for f in parsed.flags):
         return result  # hard reject
 
-    candidates = catalogue.candidates(parsed.number, game)
+    candidates = catalogue.candidates(parsed.number, parsed.name, game=game)
     if not candidates:
         return result
 

@@ -25,31 +25,39 @@ eBay UK active listings        →  identify the exact card + condition  (the #1
 The whole pipeline runs **offline on bundled sample data in Phase 1** (no API keys, no cost),
 so you can see and trust the money logic before wiring in live data.
 
-## Quickstart (Phase 1 — no API keys needed)
-
-### Backend
+## Run it
 
 ```bash
+# 1. Backend deps
 python3 -m venv .venv
 .venv/bin/pip install -e ".[dev]"
-.venv/bin/pytest                       # 48 tests, network disabled, ~96% core coverage
-.venv/bin/uvicorn trader.main:app --reload --app-dir backend   # http://localhost:8000/docs
+.venv/bin/pytest                       # full test suite (network disabled for the core)
+
+# 2. (Recommended) Import the FULL Pokémon catalogue (~20k cards, every set).
+#    Run locally — pokemontcg.io must be reachable. A free key raises rate limits.
+POKEMONTCG_API_KEY=optional .venv/bin/python -m trader.tools.import_pokemontcg
+
+# 3. Build the dashboard (the backend then serves it too)
+npm --prefix frontend install
+npm --prefix frontend run build
+
+# 4. Run everything as one process
+.venv/bin/uvicorn trader.main:app --app-dir backend     # open http://localhost:8000
 ```
 
-Key endpoints: `GET /deals`, `GET /deals?only_passing=true`, `GET /deals/{id}`,
-`GET/PUT /settings` (edit buy rules and re-rank live), `GET /health`,
-`GET /watchlist`, `GET /quota`, and `POST /scan` (live eBay UK scan — needs eBay keys).
+Then in the browser:
+1. **Sources & Keys** → paste your eBay keys + RapidAPI key (each has a "where to get this" link).
+2. **Deals** → choose **Everything (scour eBay)** and an *ending-within* window → **Run live eBay scan**.
+3. Deals are ranked best-first with green/amber/red **profit** and **sell-through** lights and a
+   one-tap **Open ↗** link to buy.
 
-### Frontend
+Without keys you'll still see ranked **demo** deals (bundled sample data) so you can try the UI.
 
-```bash
-cd frontend
-npm install
-npm run dev                            # http://localhost:5173 (expects backend on :8000)
-```
+**Dev mode** (hot-reload frontend on :5173, backend on :8000):
+`npm --prefix frontend run dev` + `.venv/bin/uvicorn trader.main:app --reload --app-dir backend`.
 
-You'll see ranked demo deals: genuine bargains flagged **BUY**, while damaged cards, joblots,
-wrong-language, mis-identified, and overpriced listings are correctly filtered out with reasons.
+API: `GET /deals`, `GET/PUT /settings`, `GET /sources` + `PUT /sources/credentials`,
+`GET /watchlist`, `GET /quota`, `POST /scan` `{mode, ending_within_hours}`, `GET /health`.
 
 ## What's built (Phase 1 ✅)
 
