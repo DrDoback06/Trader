@@ -14,7 +14,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from ..providers.factory import build_browse_source, configure_app_providers
-from ..services.credentials import CredentialStore, SECRET_FIELDS
+from ..services.credentials import SECRET_FIELDS, CredentialStore
 from ..services.sources import SOURCES, SOURCES_BY_ID, SourceInfo
 
 router = APIRouter(prefix="/sources", tags=["sources"])
