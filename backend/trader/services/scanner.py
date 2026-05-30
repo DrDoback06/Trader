@@ -14,7 +14,7 @@ from typing import Any
 
 import httpx
 
-from ..core.models import BuyingFormat, Deal, ListingFacts, ScanMode, WatchTarget
+from ..core.models import BuyingFormat, Card, Deal, ListingFacts, ScanMode, Valuation, WatchTarget
 from ..identify.catalogue import Catalogue
 from ..providers.base import ListingSource, SoldPriceProvider
 from ..providers.ebay_errors import ebay_error_detail
@@ -73,6 +73,28 @@ def _fetch_kwargs(target: WatchTarget) -> dict[str, Any]:
         "buying_options": target.buying_options,
         "sort": target.sort or "newlyListed",
     }
+
+
+class _NoSoldPrices:
+    """A sold-price provider that values nothing — lets us still emit (unvalued) deals
+    when the real sold-price service is down, so the user at least sees the listings."""
+
+    name = "none"
+
+    def get_valuation(self, card: Card, condition_key: str) -> Valuation | None:
+        return None
+
+
+_NO_SOLD_PRICES = _NoSoldPrices()
+
+
+def _valuation_error(exc: httpx.HTTPError) -> str:
+    if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code in (401, 403):
+        return (
+            "sold-price valuation unavailable — your RapidAPI key was rejected (401/403); "
+            "check it's correct and subscribed to the eBay Average Selling Price API"
+        )
+    return f"sold-price valuation unavailable — couldn't reach the service ({exc})"
 
 
 def _ask_key(listing: ListingFacts) -> float:
@@ -145,7 +167,15 @@ def scan(
     to_value = new_listings
     if max_valuations and len(to_value) > max_valuations:
         to_value = sorted(to_value, key=_ask_key)[:max_valuations]
-    result.valued = len(to_value)
-    result.unvalued = len(new_listings) - len(to_value)
-    result.deals = run_pipeline(to_value, catalogue, sold_provider, cfg)
+    try:
+        result.deals = run_pipeline(to_value, catalogue, sold_provider, cfg)
+        result.valued = len(to_value)
+        result.unvalued = len(new_listings) - len(to_value)
+    except httpx.HTTPError as exc:
+        # The sold-price service failed (e.g. RapidAPI key rejected). Still return the
+        # listings we found — unvalued — so the user sees them, with a clear reason.
+        result.errors.append(_valuation_error(exc))
+        result.deals = run_pipeline(to_value, catalogue, _NO_SOLD_PRICES, cfg)
+        result.valued = 0
+        result.unvalued = len(new_listings)
     return result

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { buyDeal, evaluateCard, fetchDeals, runScan } from "../api";
+import { buyDeal, evaluateCard, fetchDeals, runScan, searchCardListings } from "../api";
 import type { Deal } from "../types";
 import { DealsTable } from "./DealsTable";
 
@@ -42,7 +42,7 @@ export function DealsPage({
   const [error, setError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanMsg, setScanMsg] = useState<string | null>(null);
-  const [mode, setMode] = useState("everything");
+  const [mode, setMode] = useState("cheapest");
   const [hours, setHours] = useState(6);
   const [valueCap, setValueCap] = useState(250);
   const [scanned, setScanned] = useState(false);
@@ -61,6 +61,10 @@ export function DealsPage({
   const [postage, setPostage] = useState("");
   const [checking, setChecking] = useState(false);
   const [checkMsg, setCheckMsg] = useState<string | null>(null);
+  // "Search live listings" — a real eBay keyword search for the card in the box.
+  const [searching, setSearching] = useState(false);
+  const [searchGraded, setSearchGraded] = useState(false);
+  const [searchTypos, setSearchTypos] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -137,6 +141,37 @@ export function DealsPage({
     }
   };
 
+  const onSearchCard = async () => {
+    const q = cardQuery.trim();
+    if (q.length < 3) {
+      setCheckMsg("Type or pick a card to search (3+ characters).");
+      return;
+    }
+    setSearching(true);
+    setCheckMsg(null);
+    setScanMsg(null);
+    try {
+      const r = await searchCardListings({
+        query: q,
+        graded: searchGraded,
+        include_misspellings: searchTypos,
+      });
+      setScanned(true);
+      setHideSamples(false);
+      const errs = r.errors ?? [];
+      setScanMsg(
+        `Found ${r.listings_seen} live listing(s) for “${q}”${
+          r.valued ? ` · valued ${r.valued}` : ""
+        }.` + (errs.length ? ` ⚠️ ${errs.join(" · ")}` : ""),
+      );
+      load();
+    } catch (err: unknown) {
+      setCheckMsg(err instanceof Error ? err.message : "search failed");
+    } finally {
+      setSearching(false);
+    }
+  };
+
   const onBuy = async (dealId: string) => {
     try {
       await buyDeal(dealId);
@@ -146,7 +181,7 @@ export function DealsPage({
     }
   };
 
-  const showHours = mode === "ending_soon" || mode === "everything";
+  const showHours = mode === "ending_soon";
   const showSamples = !scanned && !hideSamples && deals.length > 0;
 
   const visible = useMemo(() => {
@@ -197,8 +232,10 @@ export function DealsPage({
       <div className="checkcard">
         <h2>Check a card</h2>
         <p className="sub">
-          A real valuation using your live eBay-UK sold-price key — no eBay listing key needed.
-          Type a card the way you'd search eBay, plus the price you'd pay.
+          Type a card the way you'd search eBay (or pick one from Browse). <strong>Check value</strong>{" "}
+          prices one purchase against UK sold data; <strong>Search live listings</strong> pulls every
+          live eBay listing of that card and ranks the underpriced ones — tick Graded or Misspellings
+          to widen the net.
         </p>
         <div className="controls">
           <label className="field grow">
@@ -242,6 +279,25 @@ export function DealsPage({
           <button className="primary" onClick={onCheck} disabled={checking}>
             {checking ? "Checking…" : "Check value"}
           </button>
+          <button className="bought" onClick={onSearchCard} disabled={searching}>
+            {searching ? "Searching…" : "🔎 Search live listings"}
+          </button>
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={searchGraded}
+              onChange={(e) => setSearchGraded(e.target.checked)}
+            />
+            Graded (PSA/CGC)
+          </label>
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={searchTypos}
+              onChange={(e) => setSearchTypos(e.target.checked)}
+            />
+            Include misspellings
+          </label>
           {checkMsg && <span className="scanmsg">{checkMsg}</span>}
         </div>
         {checks.length > 0 && (
@@ -269,7 +325,6 @@ export function DealsPage({
         <label className="field">
           Scan
           <select value={mode} onChange={(e) => setMode(e.target.value)}>
-            <option value="everything">Everything (scour eBay)</option>
             <option value="cheapest">Cheapest BIN &amp; offers</option>
             <option value="ending_soon">Auctions ending soon</option>
             <option value="hidden_gems">Hidden gems (typos)</option>

@@ -76,6 +76,17 @@ export function runScan(opts: ScanOptions): Promise<ScanResult> {
   return request<ScanResult>("/scan", { method: "POST", body: JSON.stringify(opts) });
 }
 
+export interface CardSearchInput {
+  query: string;
+  graded?: boolean;
+  include_misspellings?: boolean;
+  max_price?: number;
+}
+
+export function searchCardListings(input: CardSearchInput): Promise<ScanResult> {
+  return request<ScanResult>("/scan/card", { method: "POST", body: JSON.stringify(input) });
+}
+
 export interface EvaluateInput {
   query: string;
   ask_price: number;

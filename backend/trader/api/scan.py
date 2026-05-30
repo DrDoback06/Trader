@@ -19,9 +19,10 @@ from ..core.models import ListingFacts, WatchTarget
 from ..core.money import Money
 from ..core.rules import RuleSet
 from ..providers.factory import build_browse_source
-from ..services.pipeline import evaluate_listing
+from ..services.pipeline import PipelineConfig, evaluate_listing
 from ..services.scanner import scan
 from ..services.trends import attach_trends, record_snapshots
+from ..services.typos import misspellings
 from ..services.watchlist import (
     cheapest_sweep_target,
     ending_soon_sweep_target,
@@ -111,9 +112,18 @@ def get_quota(request: Request) -> dict[str, Any]:
     return {"daily_budget": q.daily_budget, "used": q.used, "remaining": q.remaining}
 
 
-@router.post("/scan")
-def run_scan(request: Request, body: ScanRequest | None = None) -> dict[str, Any]:
-    body = body or ScanRequest()
+def _execute_scan(
+    request: Request,
+    *,
+    mode: str,
+    targets: list[WatchTarget],
+    cfg: PipelineConfig,
+    max_valuations: int | None,
+) -> dict[str, Any]:
+    """Run targets against eBay Browse, value + rank, and shape the JSON response.
+    Shared by the watch-list scan and the single-card search. eBay-fetch and sold-price
+    failures are collected inside scan() (so partial results still come back), so this
+    only hard-fails when eBay returned nothing at all."""
     source = build_browse_source(request.app.state.credentials, request.app.state.settings)
     if source is None:
         raise HTTPException(
@@ -123,41 +133,19 @@ def run_scan(request: Request, body: ScanRequest | None = None) -> dict[str, Any
                 "source and add your eBay API keys under Settings → Sources."
             ),
         )
-
-    # Value a listing by its title even when it doesn't match the catalogue (flagged
-    # UNVERIFIED), so a scan still finds deals before the full catalogue is imported.
-    cfg = replace(request.app.state.pipeline_cfg, catalogue_free=True)
-    if body.mode == "graded":
-        cfg = replace(cfg, rules=RuleSet.for_holds())  # surface holds across all grades
-
-    try:
-        result = scan(
-            _targets_for(request, body),
-            source,
-            request.app.state.catalogue,
-            request.app.state.sold_provider,
-            quota=request.app.state.quota,
-            cfg=cfg,
-            max_valuations=(
-                body.max_valuations
-                if body.max_valuations is not None
-                else request.app.state.settings.max_valuations_per_scan
-            ),
-        )
-    except httpx.HTTPStatusError as exc:
-        # eBay Browse fetch errors are now collected per-target inside scan(); a raise
-        # here is the sold-price (RapidAPI) valuation step, so report *that*, not eBay.
-        detail = f"Sold-price lookup failed ({exc.response.status_code})."
-        if exc.response.status_code in (401, 403):
-            detail = (
-                "Your RapidAPI sold-price key was rejected (401/403). Check the key and that "
-                "you're subscribed to the eBay Average Selling Price API."
-            )
-        raise HTTPException(status_code=502, detail=detail) from exc
-    except httpx.HTTPError as exc:
-        raise HTTPException(
-            status_code=502, detail=f"Couldn't reach the sold-price service: {exc}"
-        ) from exc
+    result = scan(
+        targets,
+        source,
+        request.app.state.catalogue,
+        request.app.state.sold_provider,
+        quota=request.app.state.quota,
+        cfg=cfg,
+        max_valuations=(
+            max_valuations
+            if max_valuations is not None
+            else request.app.state.settings.max_valuations_per_scan
+        ),
+    )
 
     # Nothing came back from eBay and every target errored — surface eBay's *real* error
     # (e.g. errorId 1100 "Insufficient permissions") instead of guessing at the cause.
@@ -170,7 +158,7 @@ def run_scan(request: Request, body: ScanRequest | None = None) -> dict[str, Any
     # Cache the freshly scanned deals so GET /deals reflects the live scan.
     request.app.state.deals = result.deals
     return {
-        "mode": body.mode,
+        "mode": mode,
         "targets_scanned": result.targets_scanned,
         "calls_used": result.calls_used,
         "listings_seen": result.listings_seen,
@@ -178,10 +166,90 @@ def run_scan(request: Request, body: ScanRequest | None = None) -> dict[str, Any
         "valued": result.valued,
         "unvalued": result.unvalued,
         "quota_exhausted": result.quota_exhausted,
-        # Targets that failed (e.g. an eBay 403 on the category sweep) while others worked.
+        # Targets that failed (eBay 403, or valuation down) while the rest still returned.
         "errors": list(dict.fromkeys(result.errors)),
         "deals": [deal_to_dict(d) for d in result.deals],
     }
+
+
+@router.post("/scan")
+def run_scan(request: Request, body: ScanRequest | None = None) -> dict[str, Any]:
+    body = body or ScanRequest()
+    # Value a listing by its title even when it doesn't match the catalogue (flagged
+    # UNVERIFIED), so a scan still finds deals before the full catalogue is imported.
+    cfg = replace(request.app.state.pipeline_cfg, catalogue_free=True)
+    if body.mode == "graded":
+        cfg = replace(cfg, rules=RuleSet.for_holds())  # surface holds across all grades
+    return _execute_scan(
+        request,
+        mode=body.mode,
+        targets=_targets_for(request, body),
+        cfg=cfg,
+        max_valuations=body.max_valuations,
+    )
+
+
+class CardScanIn(BaseModel):
+    query: str
+    graded: bool = False
+    include_misspellings: bool = False
+    max_price: float | None = None
+    max_valuations: int | None = None
+
+
+def _misspelled_queries(query: str, limit: int = 4) -> list[str]:
+    """Typo'd variants of the card *name* (numeric tokens dropped): sellers who mistype a
+    title usually botch the name and omit the set number — the gem competitors miss."""
+    name_tokens = [t for t in query.split() if not any(ch.isdigit() for ch in t)]
+    if not name_tokens:
+        return []
+    head, *tail = name_tokens
+    suffix = (" " + " ".join(tail)) if tail else ""
+    return [f"{typo}{suffix}" for typo in misspellings(head, limit)]
+
+
+def _card_targets(
+    query: str, *, graded: bool, include_misspellings: bool, max_price: float | None
+) -> list[WatchTarget]:
+    queries = [query]
+    if graded:
+        queries += [f"{query} PSA", f"{query} CGC"]
+    if include_misspellings:
+        queries += _misspelled_queries(query)
+    buying = ("FIXED_PRICE", "BEST_OFFER", "AUCTION")
+    return [
+        WatchTarget(
+            query=q,
+            buying_options=buying,
+            sort="price",
+            max_price=max_price,
+            limit=100,
+            priority=5 if q == query else 3,
+        )
+        for q in dict.fromkeys(q for q in queries if q.strip())  # de-dupe, keep order
+    ]
+
+
+@router.post("/scan/card")
+def scan_card(request: Request, body: CardScanIn) -> dict[str, Any]:
+    """Live-search eBay UK for one specific card — a keyword search, which works on a
+    standard keyset (no category browsing) — then value the listings and rank them.
+    Optional graded (PSA/CGC) and misspelt-listing variants."""
+    query = body.query.strip()
+    if len(query) < 3:
+        raise HTTPException(status_code=400, detail="Type a card to search (3+ characters).")
+    cfg = replace(request.app.state.pipeline_cfg, catalogue_free=True)
+    if body.graded:
+        cfg = replace(cfg, rules=RuleSet.for_holds())
+    targets = _card_targets(
+        query,
+        graded=body.graded,
+        include_misspellings=body.include_misspellings,
+        max_price=body.max_price,
+    )
+    return _execute_scan(
+        request, mode=f"card:{query}", targets=targets, cfg=cfg, max_valuations=body.max_valuations
+    )
 
 
 class EvaluateIn(BaseModel):

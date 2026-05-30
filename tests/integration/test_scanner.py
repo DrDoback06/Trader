@@ -140,6 +140,39 @@ def test_scan_skips_failing_target_and_keeps_others(catalogue: Any, sold_provide
     assert result.new_listings == 1
 
 
+class _RejectingSoldProvider:
+    """A sold-price provider that 401s every lookup (e.g. a bad RapidAPI key)."""
+
+    name = "reject"
+
+    def get_valuation(self, card: Any, condition_key: str) -> Any:
+        request = httpx.Request("GET", "https://rapidapi.test/x")
+        raise httpx.HTTPStatusError(
+            "401", request=request, response=httpx.Response(401, request=request)
+        )
+
+
+@respx.mock
+def test_scan_returns_unvalued_listings_when_valuation_fails(catalogue: Any) -> None:
+    # eBay returns listings but the sold-price key is rejected — still surface the listings
+    # (unvalued) with a clear error, instead of throwing the whole scan away.
+    respx.post(OAUTH).mock(
+        return_value=httpx.Response(200, json={"access_token": "T", "expires_in": 7200})
+    )
+    respx.get(f"{BROWSE}/item_summary/search").mock(
+        return_value=httpx.Response(200, json={"itemSummaries": [_item("A")]})
+    )
+    src = EbayBrowseSource(EbayOAuth("id", "sec", OAUTH), BROWSE)
+    targets = [WatchTarget(query="charizard 199/165", category_ids=("183454",))]
+
+    result = scan(targets, src, catalogue, _RejectingSoldProvider(), quota=DailyQuota(10))
+
+    assert result.listings_seen == 1
+    assert result.deals  # the listing still comes back, just unvalued
+    assert result.valued == 0
+    assert any("RapidAPI" in e for e in result.errors)
+
+
 @respx.mock
 def test_scan_stops_at_quota(catalogue: Any, sold_provider: Any) -> None:
     respx.post(OAUTH).mock(

@@ -1,12 +1,19 @@
 from __future__ import annotations
 
 import warnings
+from pathlib import Path
 from types import SimpleNamespace
 
+import httpx
+import respx
 from fastapi.testclient import TestClient
 
-from trader.api.scan import ScanRequest, _targets_for
+from trader.api.scan import ScanRequest, _card_targets, _targets_for
+from trader.config import get_settings
 from trader.main import app
+from trader.providers.factory import configure_app_providers
+from trader.services.credentials import CredentialStore
+from trader.services.sources import DEFAULT_ENABLED
 
 warnings.filterwarnings("ignore")
 
@@ -29,6 +36,54 @@ def test_everything_uses_category_sweeps_with_full_access() -> None:
         assert any(not t.query and t.category_ids for t in targets)
     finally:
         app.state.settings.ebay_buy_api_full_access = False
+
+
+def test_card_targets_are_keyword_only_with_variants() -> None:
+    targets = _card_targets(
+        "Charizard ex 199/165", graded=True, include_misspellings=True, max_price=50
+    )
+    queries = [t.query for t in targets]
+    assert "Charizard ex 199/165" in queries  # the exact card
+    assert any(q.endswith("PSA") for q in queries)  # graded variant
+    assert any("199/165" not in q and q != "Charizard ex 199/165" for q in queries)  # a typo
+    assert all(not t.category_ids for t in targets)  # keyword-only — works on a basic keyset
+
+
+@respx.mock
+def test_scan_card_searches_specific_card_by_keyword(tmp_path: Path) -> None:
+    original = app.state.credentials  # restore after — this test mutates shared app state
+    app.state.settings.access_password = ""
+    app.state.credentials = CredentialStore.create(
+        get_settings(), set(DEFAULT_ENABLED), path=tmp_path / "creds.json"
+    )
+    app.state.credentials.set_many({"ebay_client_id": "App-PRD-1", "ebay_client_secret": "sec"})
+    configure_app_providers(app)
+    try:
+        item = {
+            "itemId": "v1|1|0",
+            "title": "Pokemon 151 Charizard ex 199/165 Near Mint",
+            "price": {"value": "40.00", "currency": "GBP"},
+            "buyingOptions": ["FIXED_PRICE"],
+            "itemLocation": {"country": "GB"},
+            "itemWebUrl": "https://www.ebay.co.uk/itm/1",
+        }
+        respx.post("https://api.ebay.com/identity/v1/oauth2/token").mock(
+            return_value=httpx.Response(200, json={"access_token": "T", "expires_in": 7200})
+        )
+        route = respx.get("https://api.ebay.com/buy/browse/v1/item_summary/search").mock(
+            return_value=httpx.Response(200, json={"itemSummaries": [item]})
+        )
+
+        r = TestClient(app).post("/scan/card", json={"query": "Charizard ex 199/165"}).json()
+        assert r["mode"] == "card:Charizard ex 199/165"
+        assert r["listings_seen"] >= 1
+        # A keyword query with NO category browsing (works on a standard keyset).
+        req = route.calls.last.request
+        assert req.url.params["q"] == "Charizard ex 199/165"
+        assert "category_ids" not in req.url.params
+    finally:
+        app.state.credentials = original
+        configure_app_providers(app)
 
 
 def test_scan_requires_credentials() -> None:
