@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     # Phase 2 — eBay Browse (live UK listing scanning)
     ebay_client_id: str = ""
     ebay_client_secret: str = ""
-    ebay_env: str = "sandbox"  # sandbox | production
+    ebay_env: str = "production"  # production | sandbox (sandbox has ~no real listings)
     ebay_marketplace_id: str = "EBAY_GB"
     ebay_oauth_base: str = "https://api.ebay.com/identity/v1/oauth2/token"
     ebay_browse_base: str = "https://api.ebay.com/buy/browse/v1"

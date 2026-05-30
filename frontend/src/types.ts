@@ -127,6 +127,8 @@ export interface ScanResult {
   calls_used: number;
   listings_seen: number;
   new_listings: number;
+  valued?: number;
+  unvalued?: number;
   quota_exhausted: boolean;
   deals: Deal[];
 }

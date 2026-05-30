@@ -82,10 +82,10 @@ def run_scan(request: Request, body: ScanRequest | None = None) -> dict[str, Any
             ),
         )
 
-    cfg = request.app.state.pipeline_cfg
-    if body.mode == "sealed":
-        cfg = replace(cfg, catalogue_free=True)  # value sealed product by title
-    elif body.mode == "graded":
+    # Value a listing by its title even when it doesn't match the catalogue (flagged
+    # UNVERIFIED), so a scan still finds deals before the full catalogue is imported.
+    cfg = replace(request.app.state.pipeline_cfg, catalogue_free=True)
+    if body.mode == "graded":
         cfg = replace(cfg, rules=RuleSet.for_holds())  # surface holds across all grades
 
     try:
