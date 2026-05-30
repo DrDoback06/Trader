@@ -1,13 +1,19 @@
 import { useEffect, useState } from "react";
-import { fetchSources, setSourceEnabled, updateCredentials } from "../api";
+import {
+  clearCredential,
+  fetchSources,
+  setSourceEnabled,
+  testEbayKeys,
+  updateCredentials,
+} from "../api";
 import type { SourcesResponse } from "../types";
 
 const KEY_FIELDS: { key: string; label: string; help: string }[] = [
-  { key: "ebay_client_id", label: "eBay Client ID (App ID)", help: "https://developer.ebay.com/join/" },
+  { key: "ebay_client_id", label: "eBay Client ID (App ID — must contain PRD)", help: "https://developer.ebay.com/my/keys" },
   {
     key: "ebay_client_secret",
-    label: "eBay Client Secret (Cert ID)",
-    help: "https://developer.ebay.com/join/",
+    label: "eBay Client Secret (Cert ID — Production)",
+    help: "https://developer.ebay.com/my/keys",
   },
   {
     key: "rapidapi_key",
@@ -47,6 +53,8 @@ export function SourcesPage() {
   const [form, setForm] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
+  const [testMsg, setTestMsg] = useState<string | null>(null);
 
   const load = () =>
     fetchSources()
@@ -60,6 +68,7 @@ export function SourcesPage() {
   const save = async () => {
     const values = Object.fromEntries(Object.entries(form).filter(([, v]) => v.trim() !== ""));
     if (Object.keys(values).length === 0) {
+      setMsg("Nothing to save — type a key into a box first.");
       return;
     }
     setSaving(true);
@@ -67,11 +76,35 @@ export function SourcesPage() {
     try {
       setData(await updateCredentials(values));
       setForm({});
-      setMsg("Saved — keys applied.");
+      setMsg(`Saved ${Object.keys(values).length} key(s) — applied.`);
     } catch (e: unknown) {
       setMsg(e instanceof Error ? e.message : "save failed");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const clearKey = async (key: string) => {
+    setMsg(null);
+    try {
+      setData(await clearCredential(key));
+      setForm((f) => ({ ...f, [key]: "" }));
+      setMsg("Cleared.");
+    } catch (e: unknown) {
+      setMsg(e instanceof Error ? e.message : "could not clear");
+    }
+  };
+
+  const testEbay = async () => {
+    setTesting(true);
+    setTestMsg(null);
+    try {
+      const r = await testEbayKeys();
+      setTestMsg((r.ok ? "✅ " : "❌ ") + r.detail);
+    } catch (e: unknown) {
+      setTestMsg(e instanceof Error ? e.message : "test failed");
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -97,29 +130,47 @@ export function SourcesPage() {
 
       <h2>Your API keys</h2>
       <p className="sub">
-        Paste a key and click Save — it applies immediately. Current values are shown masked.
+        Type or paste a key (shown so you can check it) and click <strong>Save keys</strong> — it
+        applies immediately and overwrites whatever was there. Use <strong>Clear</strong> to wipe a
+        key. Leaving a box empty keeps the current value.
       </p>
       <div className="keys">
-        {KEY_FIELDS.map((f) => (
-          <div className="keyrow" key={f.key}>
-            <label>{f.label}</label>
-            <input
-              type="password"
-              placeholder={data.credentials[f.key] ?? "not set"}
-              value={form[f.key] ?? ""}
-              onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
-            />
-            <a href={f.help} target="_blank" rel="noreferrer">
-              Where to get this ↗
-            </a>
-          </div>
-        ))}
+        {KEY_FIELDS.map((f) => {
+          const current = data.credentials[f.key];
+          return (
+            <div className="keyrow wide" key={f.key}>
+              <label>{f.label}</label>
+              <input
+                type="text"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                name={`trader_${f.key}`}
+                placeholder={current ? `current: ${current}` : "not set"}
+                value={form[f.key] ?? ""}
+                onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+              />
+              <span className="cur">{current ? `now: ${current}` : "not set"}</span>
+              <a href={f.help} target="_blank" rel="noreferrer">
+                Where to get this ↗
+              </a>
+              <button className="linkbtn" disabled={!current} onClick={() => clearKey(f.key)}>
+                Clear
+              </button>
+            </div>
+          );
+        })}
       </div>
       <div className="saverow">
         <button className="primary" onClick={save} disabled={saving}>
           {saving ? "Saving…" : "Save keys"}
         </button>
+        <button className="bought" onClick={testEbay} disabled={testing}>
+          {testing ? "Testing…" : "Test eBay keys"}
+        </button>
         {msg && <span className="scanmsg">{msg}</span>}
+        {testMsg && <span className="scanmsg">{testMsg}</span>}
       </div>
 
       <h2>Price sources</h2>

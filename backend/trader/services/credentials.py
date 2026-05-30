@@ -71,6 +71,14 @@ class CredentialStore:
                 self._values[key] = value.strip()
         self._persist()
 
+    def clear(self, key: str) -> bool:
+        """Wipe a single stored secret. Returns True if it was a known field."""
+        if key not in SECRET_FIELDS:
+            return False
+        self._values[key] = ""
+        self._persist()
+        return True
+
     def enabled_sources(self) -> set[str]:
         return set(self._enabled)
 

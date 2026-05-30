@@ -12,8 +12,10 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from ..providers.factory import configure_app_providers
-from ..services.credentials import CredentialStore
+import httpx
+
+from ..providers.factory import build_browse_source, configure_app_providers
+from ..services.credentials import CredentialStore, SECRET_FIELDS
 from ..services.sources import SOURCES, SOURCES_BY_ID, SourceInfo
 
 router = APIRouter(prefix="/sources", tags=["sources"])
@@ -77,6 +79,43 @@ def update_credentials(request: Request, body: CredentialsIn) -> dict[str, Any]:
     store.set_many({k: v for k, v in body.model_dump().items() if v is not None})
     configure_app_providers(request.app)
     return _payload(store)
+
+
+@router.delete("/credentials/{key}")
+def clear_credential(request: Request, key: str) -> dict[str, Any]:
+    store: CredentialStore = request.app.state.credentials
+    if key not in SECRET_FIELDS:
+        raise HTTPException(status_code=404, detail="unknown credential")
+    store.clear(key)
+    configure_app_providers(request.app)
+    return _payload(store)
+
+
+@router.post("/test/ebay")
+def test_ebay(request: Request) -> dict[str, Any]:
+    """Make one tiny live Browse call to check the eBay keys actually work."""
+    store: CredentialStore = request.app.state.credentials
+    client_id = store.get("ebay_client_id")
+    if not store.is_configured("ebay_client_id", "ebay_client_secret"):
+        return {"ok": False, "detail": "Enter both your eBay App ID and Cert ID first."}
+    source = build_browse_source(store, request.app.state.settings)
+    if source is None:
+        return {"ok": False, "detail": "Enable the 'eBay UK — Active listings' source first."}
+    try:
+        source.fetch(query="charizard", limit=1)
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code in (401, 403):
+            if "SBX" in client_id.upper():
+                return {
+                    "ok": False,
+                    "detail": "These are SANDBOX keys (App ID has 'SBX'). Paste your "
+                    "PRODUCTION App ID + Cert ID (they contain 'PRD').",
+                }
+            return {"ok": False, "detail": "eBay rejected these keys (401/403)."}
+        return {"ok": False, "detail": f"eBay error {exc.response.status_code}."}
+    except httpx.HTTPError as exc:
+        return {"ok": False, "detail": f"Couldn't reach eBay: {exc}"}
+    return {"ok": True, "detail": "eBay keys work — you're ready to scan. 🎉"}
 
 
 @router.put("/{source_id}")

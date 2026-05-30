@@ -50,6 +50,14 @@ export function updateCredentials(
   });
 }
 
+export function clearCredential(key: string): Promise<SourcesResponse> {
+  return request<SourcesResponse>(`/sources/credentials/${key}`, { method: "DELETE" });
+}
+
+export function testEbayKeys(): Promise<{ ok: boolean; detail: string }> {
+  return request("/sources/test/ebay", { method: "POST" });
+}
+
 export function setSourceEnabled(id: string, enabled: boolean): Promise<SourceState> {
   return request<SourceState>(`/sources/${id}`, {
     method: "PUT",

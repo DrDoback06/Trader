@@ -383,6 +383,16 @@ button.primary:disabled {
   gap: 12px;
 }
 
+.keyrow.wide {
+  grid-template-columns: 240px 1fr auto auto auto;
+}
+
+.keyrow .cur {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 @media (max-width: 720px) {
   .keyrow {
     grid-template-columns: 1fr;
