@@ -19,6 +19,7 @@ from trader.core.models import (
     Identification,
     ListingFacts,
     ParsedListing,
+    Valuation,
 )
 from trader.core.money import Money
 from trader.identify.catalogue import Catalogue
@@ -53,6 +54,7 @@ def make_deal() -> Callable[..., Deal]:
         language: str = "English",
         flags: Iterable[str] = (),
         category_id: str | None = None,
+        median: float | None = None,
     ) -> Deal:
         econ = EconomicsResult(
             buy_cost=Money.gbp(buy_cost),
@@ -98,10 +100,20 @@ def make_deal() -> Callable[..., Deal]:
             category_id=category_id,
             url="https://www.ebay.co.uk/itm/t1",
         )
+        valuation = (
+            Valuation(
+                card_id=card.id,
+                condition_key=ident.valuation_key,
+                provider="fixture",
+                median=Money.gbp(median),
+            )
+            if median is not None
+            else None
+        )
         return Deal(
             listing=listing,
             identification=ident,
-            valuation=None,
+            valuation=valuation,
             economics=econ,
             confidence=confidence,
             score=0.0,
