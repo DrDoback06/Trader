@@ -13,9 +13,11 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from ..providers.ebay_errors import ebay_error_detail
 from ..providers.factory import build_browse_source, configure_app_providers
 from ..services.credentials import SECRET_FIELDS, CredentialStore
 from ..services.sources import SOURCES, SOURCES_BY_ID, SourceInfo
+from ..services.watchlist import POKEMON_SINGLES_GB
 
 router = APIRouter(prefix="/sources", tags=["sources"])
 
@@ -92,29 +94,65 @@ def clear_credential(request: Request, key: str) -> dict[str, Any]:
 
 @router.post("/test/ebay")
 def test_ebay(request: Request) -> dict[str, Any]:
-    """Make one tiny live Browse call to check the eBay keys actually work."""
+    """Check the eBay keys the way a live scan actually uses them.
+
+    A keyword search alone can pass on a keyset that still can't run the marketplace
+    "scour" — so we test both a keyword search *and* a category sweep (what the scan
+    does). That stops the button saying "ready to scan" when the scan will 403.
+    """
     store: CredentialStore = request.app.state.credentials
-    client_id = store.get("ebay_client_id")
+    client_id = store.get("ebay_client_id") or ""
     if not store.is_configured("ebay_client_id", "ebay_client_secret"):
         return {"ok": False, "detail": "Enter both your eBay App ID and Cert ID first."}
     source = build_browse_source(store, request.app.state.settings)
     if source is None:
         return {"ok": False, "detail": "Enable the 'eBay UK — Active listings' source first."}
+
+    # 1) Keyword search — the minimum a working keyset can do.
     try:
         source.fetch(query="charizard", limit=1)
     except httpx.HTTPStatusError as exc:
-        if exc.response.status_code in (401, 403):
-            if "SBX" in client_id.upper():
-                return {
-                    "ok": False,
-                    "detail": "These are SANDBOX keys (App ID has 'SBX'). Paste your "
-                    "PRODUCTION App ID + Cert ID (they contain 'PRD').",
-                }
-            return {"ok": False, "detail": "eBay rejected these keys (401/403)."}
-        return {"ok": False, "detail": f"eBay error {exc.response.status_code}."}
+        return {"ok": False, "detail": _key_reject_detail(exc, client_id)}
     except httpx.HTTPError as exc:
         return {"ok": False, "detail": f"Couldn't reach eBay: {exc}"}
-    return {"ok": True, "detail": "eBay keys work — you're ready to scan. 🎉"}
+
+    # 2) Category sweep — exactly what "Run live scan" does. This is where a keyset that
+    #    lacks Buy/Browse production access fails, even though step 1 passed.
+    try:
+        source.fetch(
+            category_ids=[POKEMON_SINGLES_GB],
+            buying_options=("FIXED_PRICE", "BEST_OFFER"),
+            sort="price",
+            limit=1,
+        )
+    except httpx.HTTPStatusError as exc:
+        real = ebay_error_detail(exc) or f"HTTP {exc.response.status_code}"
+        return {
+            "ok": False,
+            "detail": (
+                f"Keyword search works, but the category 'scour eBay' scan was rejected: {real}. "
+                "This is a keyset permission, not a wrong key — your eBay app likely needs "
+                "Buy/Browse API production access. 'Check a card' still works meanwhile."
+            ),
+        }
+    except httpx.HTTPError as exc:
+        return {"ok": False, "detail": f"Couldn't reach eBay for the category scan: {exc}"}
+
+    return {"ok": True, "detail": "eBay keys work — keyword and category scans both pass. 🎉"}
+
+
+def _key_reject_detail(exc: httpx.HTTPStatusError, client_id: str) -> str:
+    """Why eBay rejected the keyword search — eBay's own words, plus a sandbox hint."""
+    if exc.response.status_code in (401, 403):
+        if "SBX" in client_id.upper():
+            return (
+                "These are SANDBOX keys (App ID has 'SBX'). Paste your PRODUCTION App ID + "
+                "Cert ID (they contain 'PRD')."
+            )
+        real = ebay_error_detail(exc)
+        return f"eBay rejected these keys (401/403). {real}".strip()
+    real = ebay_error_detail(exc)
+    return f"eBay error {exc.response.status_code}. {real}".strip()
 
 
 @router.put("/{source_id}")

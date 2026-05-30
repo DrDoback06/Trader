@@ -12,9 +12,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
+import httpx
+
 from ..core.models import BuyingFormat, Deal, ListingFacts, ScanMode, WatchTarget
 from ..identify.catalogue import Catalogue
 from ..providers.base import ListingSource, SoldPriceProvider
+from ..providers.ebay_errors import ebay_error_detail
 from .dedup import Dedup
 from .pipeline import PipelineConfig, run_pipeline
 from .quota import DailyQuota
@@ -30,6 +33,16 @@ class ScanResult:
     unvalued: int = 0
     quota_exhausted: bool = False
     deals: list[Deal] = field(default_factory=list)
+    # Per-target failures (e.g. eBay 403 on a category sweep) — collected rather than
+    # raised, so one bad target doesn't throw away the deals other targets found.
+    errors: list[str] = field(default_factory=list)
+
+
+def _target_label(target: WatchTarget) -> str:
+    if target.query:
+        return f'"{target.query}"'
+    cats = ",".join(target.category_ids) or "all"
+    return f"{target.mode} sweep (category {cats})"
 
 
 def _fetch_kwargs(target: WatchTarget) -> dict[str, Any]:
@@ -105,7 +118,16 @@ def scan(
             quota.spend(1)
             result.calls_used += 1
 
-            listings = source.fetch(offset=page * target.limit, **kwargs)
+            try:
+                listings = source.fetch(offset=page * target.limit, **kwargs)
+            except httpx.HTTPStatusError as exc:
+                detail = ebay_error_detail(exc) or f"HTTP {exc.response.status_code}"
+                result.errors.append(f"{_target_label(target)}: {detail}")
+                break  # skip this target's remaining pages; keep scanning the rest
+            except httpx.HTTPError as exc:
+                result.errors.append(f"{_target_label(target)}: could not reach eBay ({exc})")
+                break
+
             result.listings_seen += len(listings)
             for listing in listings:
                 if dedup.is_new(listing):

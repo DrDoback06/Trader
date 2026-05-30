@@ -145,6 +145,7 @@ export interface ScanResult {
   valued?: number;
   unvalued?: number;
   quota_exhausted: boolean;
+  errors?: string[];
   deals: Deal[];
 }
 

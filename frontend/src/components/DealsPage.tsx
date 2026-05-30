@@ -89,12 +89,15 @@ export function DealsPage({
     setScanMsg(null);
     try {
       const r = await runScan({ mode, ending_within_hours: hours, max_valuations: valueCap });
+      const errs = r.errors ?? [];
+      const warn = errs.length ? ` ⚠️ Some targets failed: ${errs.join(" · ")}` : "";
       setScanMsg(
         r.listings_seen === 0
-          ? "Scoured 0 listings — check your eBay keys are your PRODUCTION App ID / Cert ID (live scan uses production)."
+          ? "Scoured 0 listings — check your eBay keys are your PRODUCTION App ID / Cert ID (live scan uses production)." +
+              warn
           : `Scoured ${r.listings_seen} listings · ${r.new_listings} new · valued ${
               r.valued ?? r.new_listings
-            }${r.quota_exhausted ? " (daily call budget hit)" : ""}.`,
+            }${r.quota_exhausted ? " (daily call budget hit)" : ""}.` + warn,
       );
       setScanned(true);
       setHideSamples(false);

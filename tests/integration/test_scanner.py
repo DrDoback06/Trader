@@ -111,6 +111,36 @@ def test_scan_values_only_cheapest_when_capped(catalogue: Any, sold_provider: An
 
 
 @respx.mock
+def test_scan_skips_failing_target_and_keeps_others(catalogue: Any, sold_provider: Any) -> None:
+    # A 403 on one target (e.g. eBay rejects a category sweep) must not throw away the
+    # listings other targets found — record the error and carry on.
+    respx.post(OAUTH).mock(
+        return_value=httpx.Response(200, json={"access_token": "T", "expires_in": 7200})
+    )
+    respx.get(f"{BROWSE}/item_summary/search").mock(
+        side_effect=[
+            httpx.Response(
+                403,
+                json={"errors": [{"errorId": 1100, "message": "Insufficient permissions."}]},
+            ),
+            httpx.Response(200, json={"itemSummaries": [_item("A")]}),
+        ]
+    )
+    src = EbayBrowseSource(EbayOAuth("id", "sec", OAUTH), BROWSE)
+    targets = [
+        WatchTarget(query="charizard", category_ids=("183454",), priority=5),
+        WatchTarget(query="pikachu", category_ids=("183454",), priority=1),
+    ]
+
+    result = scan(targets, src, catalogue, sold_provider, quota=DailyQuota(10))
+
+    assert len(result.errors) == 1
+    assert "errorId 1100" in result.errors[0]
+    assert result.listings_seen == 1  # second target still scoured a listing
+    assert result.new_listings == 1
+
+
+@respx.mock
 def test_scan_stops_at_quota(catalogue: Any, sold_provider: Any) -> None:
     respx.post(OAUTH).mock(
         return_value=httpx.Response(200, json={"access_token": "T", "expires_in": 7200})
