@@ -92,6 +92,21 @@ export interface Allocation {
   chosen: Deal[];
 }
 
+export interface Rules {
+  total_budget: Money;
+  max_spend_per_card: Money;
+  min_profit: Money;
+  min_roi: number;
+  min_margin: number;
+  min_confidence: number;
+  min_sell_probability: number;
+  min_annualised_roi: number;
+  min_discount: number;
+  graded_policy: string;
+  language_whitelist: string[];
+  exclude_flags: string[];
+}
+
 export interface Position {
   id: number;
   card: string;

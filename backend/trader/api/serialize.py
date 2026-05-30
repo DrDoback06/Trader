@@ -119,6 +119,7 @@ def ruleset_to_dict(r: RuleSet) -> dict[str, Any]:
         "min_confidence": r.min_confidence,
         "min_sell_probability": r.min_sell_probability,
         "min_annualised_roi": r.min_annualised_roi,
+        "min_discount": r.min_discount,
         "graded_policy": r.graded_policy.value,
         "language_whitelist": list(r.language_whitelist),
         "exclude_flags": list(r.exclude_flags),

@@ -2,9 +2,10 @@ import { useState } from "react";
 import { BrowsePage } from "./components/BrowsePage";
 import { DealsPage } from "./components/DealsPage";
 import { PortfolioPage } from "./components/PortfolioPage";
+import { SettingsPage } from "./components/SettingsPage";
 import { SourcesPage } from "./components/SourcesPage";
 
-type View = "deals" | "browse" | "portfolio" | "sources";
+type View = "deals" | "browse" | "portfolio" | "settings" | "sources";
 
 export default function App() {
   const [view, setView] = useState<View>("deals");
@@ -37,6 +38,12 @@ export default function App() {
           >
             Portfolio
           </button>
+          <button
+            className={view === "settings" ? "active" : ""}
+            onClick={() => setView("settings")}
+          >
+            Settings
+          </button>
           <button className={view === "sources" ? "active" : ""} onClick={() => setView("sources")}>
             Sources &amp; Keys
           </button>
@@ -48,6 +55,7 @@ export default function App() {
       )}
       {view === "browse" && <BrowsePage onPick={pickCard} />}
       {view === "portfolio" && <PortfolioPage />}
+      {view === "settings" && <SettingsPage />}
       {view === "sources" && <SourcesPage />}
 
       <footer className="foot">

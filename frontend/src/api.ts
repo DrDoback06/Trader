@@ -4,6 +4,7 @@ import type {
   Deal,
   Portfolio,
   RelistPreview,
+  Rules,
   ScanResult,
   SetInfo,
   SourcesResponse,
@@ -75,6 +76,14 @@ export interface EvaluateInput {
 
 export function evaluateCard(input: EvaluateInput): Promise<Deal> {
   return request<Deal>("/evaluate", { method: "POST", body: JSON.stringify(input) });
+}
+
+export function fetchRules(): Promise<{ rules: Rules }> {
+  return request("/settings");
+}
+
+export function updateRules(patch: Record<string, number>): Promise<{ rules: Rules }> {
+  return request("/settings", { method: "PUT", body: JSON.stringify(patch) });
 }
 
 export function fetchSets(): Promise<{ total_cards: number; sets: SetInfo[] }> {
