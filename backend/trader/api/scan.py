@@ -106,7 +106,18 @@ def run_scan(request: Request, body: ScanRequest | None = None) -> dict[str, Any
     except httpx.HTTPStatusError as exc:
         detail = "eBay rejected the request"
         if exc.response.status_code in (401, 403):
-            detail = "eBay rejected your credentials (401/403). Check your keys and EBAY_ENV."
+            client_id = request.app.state.credentials.get("ebay_client_id")
+            if "SBX" in client_id.upper():
+                detail = (
+                    "You're using your eBay SANDBOX keys (App ID contains 'SBX'), but live "
+                    "scanning uses Production. Paste your PRODUCTION App ID + Cert ID (they "
+                    "contain 'PRD') under Sources & Keys."
+                )
+            else:
+                detail = (
+                    "eBay rejected your credentials (401/403). Check your Production App ID + "
+                    "Cert ID are correct and the keyset is enabled."
+                )
         raise HTTPException(status_code=502, detail=detail) from exc
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=502, detail=f"Could not reach eBay: {exc}") from exc
