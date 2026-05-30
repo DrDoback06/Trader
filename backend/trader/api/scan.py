@@ -238,7 +238,9 @@ def scan_card(request: Request, body: CardScanIn) -> dict[str, Any]:
     query = body.query.strip()
     if len(query) < 3:
         raise HTTPException(status_code=400, detail="Type a card to search (3+ characters).")
-    cfg = replace(request.app.state.pipeline_cfg, catalogue_free=True)
+    # An explicit card search is never "bulk" — drop the min-market-value floor.
+    exact_rules = replace(request.app.state.pipeline_cfg.rules, min_market_value=Money.gbp(0))
+    cfg = replace(request.app.state.pipeline_cfg, catalogue_free=True, rules=exact_rules)
     if body.graded:
         cfg = replace(cfg, rules=RuleSet.for_holds())
     targets = _card_targets(
@@ -270,8 +272,9 @@ def evaluate_card(request: Request, body: EvaluateIn) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail="Enter the price you'd pay (greater than 0).")
 
     # catalogue_free: value any typed-in title directly, even when it isn't in the
-    # bundled catalogue (the full ~20k-card catalogue is an optional local import).
-    cfg = replace(request.app.state.pipeline_cfg, catalogue_free=True)
+    # bundled catalogue. An explicit check is never "bulk" — drop the value floor too.
+    exact_rules = replace(request.app.state.pipeline_cfg.rules, min_market_value=Money.gbp(0))
+    cfg = replace(request.app.state.pipeline_cfg, catalogue_free=True, rules=exact_rules)
     listing = ListingFacts(
         external_id=f"check:{query.lower()}",
         title=query,

@@ -52,6 +52,7 @@ def _fetch_kwargs(target: WatchTarget) -> dict[str, Any]:
         "category_ids": list(target.category_ids) or None,
         "condition_ids": list(target.condition_ids) or None,
         "max_price": target.max_price,
+        "min_price": target.min_price,
     }
     if target.mode is ScanMode.CHEAPEST:
         return {

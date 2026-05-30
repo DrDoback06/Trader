@@ -12,10 +12,14 @@ from .typos import hidden_gem_queries
 # eBay GB "Pokémon Individual Cards" leaf category.
 POKEMON_SINGLES_GB = "183454"
 
+# Category/grade sweeps sort by price ascending, so without a floor they'd return
+# nothing but £0.01 bulk commons. Skip anything cheaper than this on a sweep.
+BULK_FLOOR_GBP = 4.0
+
 
 def cheapest_sweep_target(
     *, category_ids: tuple[str, ...] = (POKEMON_SINGLES_GB,), max_price: float | None = None,
-    pages: int = 2, limit: int = 100,
+    min_price: float | None = BULK_FLOOR_GBP, pages: int = 2, limit: int = 100,
 ) -> WatchTarget:
     """Scour a whole category for the cheapest Buy-It-Now / Best-Offer listings."""
     return WatchTarget(
@@ -25,6 +29,7 @@ def cheapest_sweep_target(
         buying_options=("FIXED_PRICE", "BEST_OFFER"),
         sort="price",
         max_price=max_price,
+        min_price=min_price,
         pages=pages,
         limit=limit,
         priority=4,
@@ -33,7 +38,8 @@ def cheapest_sweep_target(
 
 def ending_soon_sweep_target(
     *, ending_within_hours: int = 12, category_ids: tuple[str, ...] = (POKEMON_SINGLES_GB,),
-    max_price: float | None = None, pages: int = 2, limit: int = 100,
+    max_price: float | None = None, min_price: float | None = BULK_FLOOR_GBP,
+    pages: int = 2, limit: int = 100,
 ) -> WatchTarget:
     """Scour a whole category for auctions ending within the given window."""
     return WatchTarget(
@@ -44,6 +50,7 @@ def ending_soon_sweep_target(
         ending_within_hours=ending_within_hours,
         sort="endingSoonest",
         max_price=max_price,
+        min_price=min_price,
         pages=pages,
         limit=limit,
         priority=4,
@@ -70,6 +77,7 @@ def graded_sweep_targets(
             buying_options=("FIXED_PRICE", "BEST_OFFER", "AUCTION"),
             sort="price",
             max_price=max_price,
+            min_price=BULK_FLOOR_GBP,  # a £0.01 "PSA 10" hit is junk, not a slab
             limit=limit,
             priority=3,
         )

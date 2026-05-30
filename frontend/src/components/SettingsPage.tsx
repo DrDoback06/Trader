@@ -7,6 +7,11 @@ const MONEY = [
   { key: "total_budget", label: "Total budget (£)", hint: "Your working capital" },
   { key: "max_spend_per_card", label: "Max spend per card (£)", hint: "Skip anything dearer" },
   { key: "min_profit", label: "Min profit (£)", hint: "Don't bother below this" },
+  {
+    key: "min_market_value",
+    label: "Ignore cards under (£)",
+    hint: "Filters out bulk; raise to only see cards worth real money",
+  },
 ] as const;
 
 const PCT = [
@@ -23,6 +28,7 @@ function formFromRules(r: Rules): Record<string, string> {
     total_budget: String(r.total_budget.amount),
     max_spend_per_card: String(r.max_spend_per_card.amount),
     min_profit: String(r.min_profit.amount),
+    min_market_value: String(r.min_market_value.amount),
     min_roi: String(Math.round(r.min_roi * 100)),
     min_margin: String(Math.round(r.min_margin * 100)),
     min_confidence: String(Math.round(r.min_confidence * 100)),

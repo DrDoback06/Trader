@@ -114,6 +114,7 @@ class WatchTarget:
     category_ids: tuple[str, ...] = ()
     buying_options: tuple[str, ...] = ("FIXED_PRICE",)
     max_price: float | None = None
+    min_price: float | None = None  # floor (skip bulk on category sweeps)
     condition_ids: tuple[str, ...] = ()
     ending_within_hours: int | None = None
     sort: str | None = None

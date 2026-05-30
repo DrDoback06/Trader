@@ -23,6 +23,7 @@ class RuleSetIn(BaseModel):
     total_budget: float | None = None
     max_spend_per_card: float | None = None
     min_profit: float | None = None
+    min_market_value: float | None = None
     min_roi: float | None = None
     min_margin: float | None = None
     min_confidence: float | None = None
@@ -44,6 +45,8 @@ def update_settings(request: Request, body: RuleSetIn) -> dict[str, Any]:
         rules.max_spend_per_card = Money.gbp(body.max_spend_per_card)
     if body.min_profit is not None:
         rules.min_profit = Money.gbp(body.min_profit)
+    if body.min_market_value is not None:
+        rules.min_market_value = Money.gbp(body.min_market_value)
     if body.min_roi is not None:
         rules.min_roi = body.min_roi
     if body.min_margin is not None:
