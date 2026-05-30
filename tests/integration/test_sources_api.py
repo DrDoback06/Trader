@@ -49,9 +49,10 @@ def test_cannot_enable_unavailable_source(tmp_path: Path) -> None:
 
 
 @respx.mock
-def test_test_ebay_flags_category_sweep_rejection(tmp_path: Path) -> None:
-    # Keys that pass a keyword search but fail the category 'scour' (the real scan call)
-    # must report ok:False with eBay's own error — not a false "ready to scan".
+def test_test_ebay_explains_category_sweep_limit(tmp_path: Path) -> None:
+    # Keys that pass a keyword search but fail the category 'scour' are still usable —
+    # keyword scanning is what the scanner uses — so report ok:True but explain the limit
+    # with eBay's own error, rather than a false "everything works".
     client = _client(tmp_path)
     app.state.credentials.set_many(
         {"ebay_client_id": "App-PRD-1234", "ebay_client_secret": "PRD-secret"}
@@ -72,6 +73,6 @@ def test_test_ebay_flags_category_sweep_rejection(tmp_path: Path) -> None:
     )
 
     body = client.post("/sources/test/ebay").json()
-    assert body["ok"] is False
+    assert body["ok"] is True  # keyword scans work — that's what the scanner uses
     assert "scour" in body["detail"].lower()
     assert "errorId 1100" in body["detail"]

@@ -172,6 +172,19 @@ export function SourcesPage() {
         {msg && <span className="scanmsg">{msg}</span>}
         {testMsg && <span className="scanmsg">{testMsg}</span>}
       </div>
+      <p className="sub">
+        💡 A standard eBay keyset scans by <strong>card name</strong> straight away — that's what the
+        scanner uses. eBay's whole-category <em>“scour everything”</em> sweeps need{" "}
+        <strong>Buy API full access</strong>, granted via an{" "}
+        <a
+          href="https://developer.ebay.com/api-docs/buy/static/buy-requirements.html"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Application Growth Check
+        </a>
+        . You don't need it to start finding deals.
+      </p>
 
       <h2>Price sources</h2>
       <p className="sub">

@@ -57,21 +57,47 @@ def _scan_error_detail(request: Request, errors: list[str]) -> str:
     return " ".join(parts)
 
 
+def _basic_keyset_target(target: WatchTarget) -> WatchTarget:
+    """Make a target runnable on a standard eBay keyset: pure keyword searches work, but
+    whole-category browsing needs Buy API full access. Drop the category filter from
+    keyword targets; leave category-only sweeps untouched (they can't run without it, and
+    will surface eBay's real 'needs full access' error if the user runs that mode)."""
+    return replace(target, category_ids=()) if target.query else target
+
+
 def _targets_for(request: Request, body: ScanRequest) -> list[WatchTarget]:
+    full = request.app.state.settings.ebay_buy_api_full_access
+    max_price = body.max_price
     watchlist = list(request.app.state.watchlist)
-    cheapest = cheapest_sweep_target(max_price=body.max_price)
+    cheapest = cheapest_sweep_target(max_price=max_price)
     ending = ending_soon_sweep_target(
-        ending_within_hours=body.ending_within_hours, max_price=body.max_price
+        ending_within_hours=body.ending_within_hours, max_price=max_price
     )
-    return {
+
+    # "Everything" scours the marketplace. With Buy API full access that's whole-category
+    # sweeps; on a standard keyset we fan out across many *keyword* searches instead (card
+    # names, sealed product, graded grails, typo'd listings) — all of which work today.
+    everything = (
+        [*watchlist, cheapest, ending]
+        if full
+        else [
+            *watchlist,
+            *hidden_gem_targets(max_price=max_price),
+            *sealed_sweep_targets(max_price=max_price),
+            *graded_sweep_targets(max_price=max_price),
+        ]
+    )
+    targets = {
         "watchlist": watchlist,
         "cheapest": [cheapest],
         "ending_soon": [ending],
-        "hidden_gems": hidden_gem_targets(max_price=body.max_price),
-        "graded": graded_sweep_targets(max_price=body.max_price),
-        "sealed": sealed_sweep_targets(max_price=body.max_price),
-        "everything": [*watchlist, cheapest, ending],
+        "hidden_gems": hidden_gem_targets(max_price=max_price),
+        "graded": graded_sweep_targets(max_price=max_price),
+        "sealed": sealed_sweep_targets(max_price=max_price),
+        "everything": everything,
     }.get(body.mode, watchlist)
+
+    return targets if full else [_basic_keyset_target(t) for t in targets]
 
 
 @router.get("/watchlist")

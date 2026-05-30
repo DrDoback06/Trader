@@ -127,12 +127,14 @@ def test_ebay(request: Request) -> dict[str, Any]:
         )
     except httpx.HTTPStatusError as exc:
         real = ebay_error_detail(exc) or f"HTTP {exc.response.status_code}"
+        # Keyword scanning works — that's what the scanner uses on a standard keyset — so
+        # this isn't a blocker. The whole-category "scour" needs Buy API full access.
         return {
-            "ok": False,
+            "ok": True,
             "detail": (
-                f"Keyword search works, but the category 'scour eBay' scan was rejected: {real}. "
-                "This is a keyset permission, not a wrong key — your eBay app likely needs "
-                "Buy/Browse API production access. 'Check a card' still works meanwhile."
+                "Keys work for card-name scans — that's what the scanner uses, so you can scan "
+                f"now. 🎉 The whole-category 'scour' is limited by eBay ({real}); unlocking it "
+                "needs Buy API full access (Settings explains how)."
             ),
         }
     except httpx.HTTPError as exc:

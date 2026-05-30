@@ -1,12 +1,34 @@
 from __future__ import annotations
 
 import warnings
+from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
+from trader.api.scan import ScanRequest, _targets_for
 from trader.main import app
 
 warnings.filterwarnings("ignore")
+
+
+def test_everything_uses_keyword_targets_on_basic_keyset() -> None:
+    # A standard eBay keyset can't run whole-category sweeps, so "everything" fans out
+    # across keyword searches with the category filter stripped (proven to work).
+    app.state.settings.ebay_buy_api_full_access = False
+    targets = _targets_for(SimpleNamespace(app=app), ScanRequest(mode="everything"))
+    assert targets
+    assert all(t.query for t in targets)  # every target is a keyword search
+    assert all(not t.category_ids for t in targets)  # no category filter on a basic keyset
+
+
+def test_everything_uses_category_sweeps_with_full_access() -> None:
+    app.state.settings.ebay_buy_api_full_access = True
+    try:
+        targets = _targets_for(SimpleNamespace(app=app), ScanRequest(mode="everything"))
+        # With full access the category-only sweeps (no query) are included.
+        assert any(not t.query and t.category_ids for t in targets)
+    finally:
+        app.state.settings.ebay_buy_api_full_access = False
 
 
 def test_scan_requires_credentials() -> None:
