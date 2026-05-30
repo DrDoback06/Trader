@@ -44,6 +44,7 @@ export function DealsPage({
   const [scanMsg, setScanMsg] = useState<string | null>(null);
   const [mode, setMode] = useState("everything");
   const [hours, setHours] = useState(6);
+  const [valueCap, setValueCap] = useState(250);
   const [scanned, setScanned] = useState(false);
   const [hideSamples, setHideSamples] = useState(false);
 
@@ -87,7 +88,7 @@ export function DealsPage({
     setScanning(true);
     setScanMsg(null);
     try {
-      const r = await runScan({ mode, ending_within_hours: hours });
+      const r = await runScan({ mode, ending_within_hours: hours, max_valuations: valueCap });
       setScanMsg(
         r.listings_seen === 0
           ? "Scoured 0 listings — check your eBay keys are your PRODUCTION App ID / Cert ID (live scan uses production)."
@@ -287,6 +288,21 @@ export function DealsPage({
             </select>
           </label>
         )}
+
+        <label className="field">
+          Value up to
+          <input
+            type="number"
+            min="1"
+            max="250"
+            value={valueCap}
+            onChange={(e) =>
+              setValueCap(Math.max(1, Math.min(250, Number(e.target.value) || 1)))
+            }
+            style={{ width: 64 }}
+            title="How many of the cheapest new listings to fetch a live value for this scan (caps RapidAPI calls)"
+          />
+        </label>
 
         <button className="primary" onClick={onScan} disabled={scanning}>
           {scanning ? "Scanning…" : "↻ Run live eBay scan"}

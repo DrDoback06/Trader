@@ -60,6 +60,7 @@ export interface ScanOptions {
   mode: string;
   ending_within_hours?: number;
   max_price?: number;
+  max_valuations?: number;
 }
 
 export function runScan(opts: ScanOptions): Promise<ScanResult> {

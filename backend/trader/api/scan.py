@@ -39,6 +39,7 @@ class ScanRequest(BaseModel):
     mode: str = "watchlist"
     ending_within_hours: int = 12
     max_price: float | None = None
+    max_valuations: int | None = None  # cap live valuations this scan (else server default)
 
 
 def _targets_for(request: Request, body: ScanRequest) -> list[WatchTarget]:
@@ -96,7 +97,11 @@ def run_scan(request: Request, body: ScanRequest | None = None) -> dict[str, Any
             request.app.state.sold_provider,
             quota=request.app.state.quota,
             cfg=cfg,
-            max_valuations=request.app.state.settings.max_valuations_per_scan,
+            max_valuations=(
+                body.max_valuations
+                if body.max_valuations is not None
+                else request.app.state.settings.max_valuations_per_scan
+            ),
         )
     except httpx.HTTPStatusError as exc:
         detail = "eBay rejected the request"

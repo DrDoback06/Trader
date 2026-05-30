@@ -21,13 +21,20 @@ REM If the app and its key libraries already import, skip the (network) install.
 ".venv\Scripts\python.exe" -c "import trader, sqlalchemy, apscheduler, fastapi, uvicorn" 2>nul
 if not errorlevel 1 (
     echo   Packages already installed - skipping download.
-    goto :frontend
+    goto :catalogue
 )
 echo   Installing Python packages ^(needs internet the first time^)...
 ".venv\Scripts\python.exe" -m pip install --timeout 120 --retries 10 --upgrade pip
 ".venv\Scripts\python.exe" -m pip install --timeout 120 --retries 10 -e ".[dev]"
 ".venv\Scripts\python.exe" -c "import trader, sqlalchemy, apscheduler, fastapi, uvicorn" 2>nul
 if errorlevel 1 goto :deps_failed
+
+:catalogue
+if /I "%~1"=="--catalogue" (
+    echo.
+    echo Importing the full Pokemon catalogue ^(needs internet; a few minutes^)...
+    ".venv\Scripts\python.exe" -m trader.tools.import_pokemontcg
+)
 
 :frontend
 echo.
