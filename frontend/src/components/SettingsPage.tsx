@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { fetchRules, updateRules } from "../api";
+import { fetchAlertStatus, fetchRules, setSchedule, testAlert, updateRules } from "../api";
+import type { AlertStatus } from "../api";
 import type { Rules } from "../types";
 
 const MONEY = [
@@ -13,8 +14,8 @@ const PCT = [
   { key: "min_margin", label: "Min margin (%)", hint: "Profit ÷ sale price" },
   { key: "min_confidence", label: "Min match confidence (%)", hint: "How sure the card ID is" },
   { key: "min_discount", label: "Min discount vs market (%)", hint: "How far below market to buy" },
-  { key: "min_sell_probability", label: "Min sell-through (%)", hint: "0 = don't filter by liquidity" },
-  { key: "min_annualised_roi", label: "Min annualised ROI (%)", hint: "0 = don't require fast turnover" },
+  { key: "min_sell_probability", label: "Min sell-through (%)", hint: "0 = ignore liquidity" },
+  { key: "min_annualised_roi", label: "Min annualised ROI (%)", hint: "0 = ignore turnover speed" },
 ] as const;
 
 function formFromRules(r: Rules): Record<string, string> {
@@ -38,6 +39,12 @@ export function SettingsPage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // Auto-scan & alerts
+  const [status, setStatus] = useState<AlertStatus | null>(null);
+  const [intervalMin, setIntervalMin] = useState("0");
+  const [busy, setBusy] = useState(false);
+  const [alertMsg, setAlertMsg] = useState<string | null>(null);
+
   useEffect(() => {
     fetchRules()
       .then((r) => {
@@ -45,6 +52,12 @@ export function SettingsPage() {
         setForm(formFromRules(r.rules));
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "failed to load"));
+    fetchAlertStatus()
+      .then((s) => {
+        setStatus(s);
+        setIntervalMin(String(s.interval_min));
+      })
+      .catch(() => undefined);
   }, []);
 
   const onSave = async () => {
@@ -66,6 +79,29 @@ export function SettingsPage() {
       setMsg(e instanceof Error ? e.message : "save failed");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const onApplySchedule = async () => {
+    setBusy(true);
+    setAlertMsg(null);
+    try {
+      setStatus(await setSchedule(Math.max(0, Number(intervalMin) || 0)));
+      setAlertMsg("Updated.");
+    } catch (e: unknown) {
+      setAlertMsg(e instanceof Error ? e.message : "could not update");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onTest = async () => {
+    setAlertMsg(null);
+    try {
+      const r = await testAlert();
+      setAlertMsg(`Test sent via ${r.channel}.`);
+    } catch (e: unknown) {
+      setAlertMsg(e instanceof Error ? e.message : "test failed");
     }
   };
 
@@ -118,9 +154,43 @@ export function SettingsPage() {
         </button>
         {msg && <span className="scanmsg">{msg}</span>}
       </div>
+
+      <h2>Auto-scan &amp; alerts</h2>
+      <p className="sub">
+        Scan automatically every few minutes and get pushed the new green deals. On this laptop it
+        only runs while the app is open — deploy to a host for 24/7. Add a Telegram bot token + chat
+        ID under <strong>Sources &amp; Keys</strong> for phone alerts (otherwise alerts print to the
+        server log).
+      </p>
+      <div className="controls">
+        <label className="field">
+          Scan every (min, 0 = off)
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={intervalMin}
+            onChange={(e) => setIntervalMin(e.target.value)}
+            style={{ width: 80 }}
+          />
+        </label>
+        <button className="primary" onClick={onApplySchedule} disabled={busy}>
+          {busy ? "Applying…" : "Apply"}
+        </button>
+        <button className="bought" onClick={onTest}>
+          Send test alert
+        </button>
+        {status && (
+          <span className="scanmsg">
+            {status.running ? `ON · every ${status.interval_min} min` : "off"} · channel:{" "}
+            {status.channel}
+          </span>
+        )}
+        {alertMsg && <span className="scanmsg">{alertMsg}</span>}
+      </div>
       <p className="note">
-        Tip: to “pull everything and just see the best,” keep these modest and rely on the
-        ranking + the “Only deals that clear my buy rules” toggle on the Deals tab.
+        ⚠️ Each auto-scan uses your eBay + sold-price quota. Keep the interval sensible (e.g. 15–30
+        min) and the “Value up to” cap modest.
       </p>
     </div>
   );

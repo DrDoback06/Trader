@@ -24,6 +24,8 @@ SECRET_FIELDS: tuple[str, ...] = (
     "pricecharting_api_key",
     "anthropic_api_key",
     "ebay_user_token",
+    "telegram_bot_token",
+    "telegram_chat_id",
 )
 
 

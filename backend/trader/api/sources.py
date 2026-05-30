@@ -58,6 +58,8 @@ class CredentialsIn(BaseModel):
     pricecharting_api_key: str | None = None
     anthropic_api_key: str | None = None
     ebay_user_token: str | None = None
+    telegram_bot_token: str | None = None
+    telegram_chat_id: str | None = None
 
 
 class EnableIn(BaseModel):

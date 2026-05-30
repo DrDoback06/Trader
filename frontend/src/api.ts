@@ -86,6 +86,27 @@ export function updateRules(patch: Record<string, number>): Promise<{ rules: Rul
   return request("/settings", { method: "PUT", body: JSON.stringify(patch) });
 }
 
+export interface AlertStatus {
+  interval_min: number;
+  channel: string;
+  running: boolean;
+}
+
+export function fetchAlertStatus(): Promise<AlertStatus> {
+  return request<AlertStatus>("/alerts/status");
+}
+
+export function setSchedule(interval_min: number): Promise<AlertStatus> {
+  return request<AlertStatus>("/alerts/schedule", {
+    method: "POST",
+    body: JSON.stringify({ interval_min }),
+  });
+}
+
+export function testAlert(): Promise<{ sent: boolean; channel: string }> {
+  return request("/alerts/test", { method: "POST", body: JSON.stringify({}) });
+}
+
 export function fetchSets(): Promise<{ total_cards: number; sets: SetInfo[] }> {
   return request("/catalogue/sets");
 }

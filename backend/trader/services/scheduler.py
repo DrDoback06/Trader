@@ -39,7 +39,7 @@ def run_scan_cycle(app: Any) -> int:
     attach_trends(app.state.session_maker, result.deals)
     record_snapshots(app.state.session_maker, result.deals)
     app.state.deals = result.deals
-    channel = build_alert_channel(app.state.settings)
+    channel = build_alert_channel(app.state.credentials, app.state.settings)
     return dispatch_alerts(
         result.deals, channel, app.state.session_maker, channel_name=channel.name
     )
