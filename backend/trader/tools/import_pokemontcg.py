@@ -92,18 +92,26 @@ def write_sets(sets: dict[str, dict[str, Any]], out_dir: str | Path) -> int:
 # --- network runner ------------------------------------------------------------
 
 def _get_with_retry(
-    client: httpx.Client, params: dict[str, Any], headers: dict[str, str], tries: int = 5
+    client: httpx.Client, params: dict[str, Any], headers: dict[str, str], tries: int = 8
 ) -> httpx.Response:
     delay = 2.0
     for attempt in range(tries):
-        resp = client.get(API_URL, params=params, headers=headers)
+        try:
+            resp = client.get(API_URL, params=params, headers=headers)
+        except httpx.HTTPError as exc:  # timeouts, connection resets, DNS, etc.
+            if attempt == tries - 1:
+                raise
+            print(f"    network error ({type(exc).__name__}); retrying in {delay:.0f}s…")
+            time.sleep(delay)
+            delay = min(delay * 2, 30.0)
+            continue
         if resp.status_code == 429 or resp.status_code >= 500:
             if attempt == tries - 1:
                 resp.raise_for_status()
             wait = float(resp.headers.get("Retry-After") or delay)
             print(f"    rate-limited/{resp.status_code}; retrying in {wait:.0f}s…")
             time.sleep(wait)
-            delay *= 2
+            delay = min(delay * 2, 30.0)
             continue
         resp.raise_for_status()
         return resp
@@ -116,11 +124,31 @@ def fetch_all_cards(
     page_size: int = 250,
     sleep: float = 0.25,
     client: httpx.Client | None = None,
+    checkpoint_dir: str | Path | None = None,
 ) -> list[dict[str, Any]]:
-    client = client or httpx.Client(timeout=60.0)
+    client = client or httpx.Client(timeout=httpx.Timeout(90.0, connect=30.0))
     headers = {"X-Api-Key": api_key} if api_key else {}
+
+    cards_path: Path | None = None
+    state_path: Path | None = None
+    if checkpoint_dir is not None:
+        cp = Path(checkpoint_dir)
+        cp.mkdir(parents=True, exist_ok=True)
+        cards_path = cp / "_import_cards.jsonl"
+        state_path = cp / "_import_state.json"
+
     cards: list[dict[str, Any]] = []
     page = 1
+    # Resume a previously-interrupted import if a checkpoint is present.
+    if cards_path and state_path and cards_path.exists() and state_path.exists():
+        cards = [
+            json.loads(line)
+            for line in cards_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        page = int(json.loads(state_path.read_text(encoding="utf-8")).get("next_page", 1))
+        print(f"  resuming from page {page} ({len(cards)} cards already saved)")
+
     while True:
         resp = _get_with_retry(
             client,
@@ -132,6 +160,11 @@ def fetch_all_cards(
         cards.extend(batch)
         total = int(data.get("totalCount", 0))
         print(f"  page {page}: +{len(batch)} ({len(cards)}/{total})")
+        if cards_path and state_path:  # checkpoint after each page so drops don't lose work
+            with cards_path.open("a", encoding="utf-8") as f:
+                for c in batch:
+                    f.write(json.dumps(c, ensure_ascii=False) + "\n")
+            state_path.write_text(json.dumps({"next_page": page + 1}), encoding="utf-8")
         if not batch or len(cards) >= total:
             break
         page += 1
@@ -146,11 +179,17 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--page-size", type=int, default=250)
     args = parser.parse_args(argv)
 
-    print("Fetching every Pokémon card from pokemontcg.io … (a minute or two)")
-    cards = fetch_all_cards(api_key=args.api_key, page_size=args.page_size)
+    print("Fetching every Pokémon card from pokemontcg.io … (a few minutes)")
+    print("If your connection drops, just run this again — it resumes where it left off.")
+    cards = fetch_all_cards(
+        api_key=args.api_key, page_size=args.page_size, checkpoint_dir=args.out
+    )
     sets = group_to_sets(cards)
     total_cards = sum(len(s["cards"]) for s in sets.values())
     n = write_sets(sets, args.out)
+    # Import finished cleanly — clear the resume checkpoint.
+    for name in ("_import_cards.jsonl", "_import_state.json"):
+        (Path(args.out) / name).unlink(missing_ok=True)
     print(f"\nDone: {total_cards} cards across {n} sets -> {args.out}")
     print("Restart the backend; the app will now use the full catalogue.")
 

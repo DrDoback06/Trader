@@ -66,6 +66,8 @@ class Catalogue:
         cards: list[Card] = []
         set_meta: dict[str, dict[str, str]] = {}
         for fp in sorted(Path(path).rglob("*.json")):
+            if fp.name.startswith("_"):
+                continue  # skip importer checkpoint/temp files (_import_state.json, …)
             data = json.loads(fp.read_text(encoding="utf-8"))
             game = Game(data["game"])
             set_code = data["set_code"]
