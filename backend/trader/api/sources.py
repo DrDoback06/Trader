@@ -9,10 +9,9 @@ from __future__ import annotations
 
 from typing import Any
 
+import httpx
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
-
-import httpx
 
 from ..providers.factory import build_browse_source, configure_app_providers
 from ..services.credentials import CredentialStore, SECRET_FIELDS
