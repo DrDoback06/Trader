@@ -141,7 +141,7 @@ export function DealsPage({
   };
 
   const showHours = mode === "ending_soon" || mode === "everything";
-  const showSamples = !scanned && !hideSamples;
+  const showSamples = !scanned && !hideSamples && deals.length > 0;
 
   const visible = useMemo(() => {
     const maxP = Number(fMax);
@@ -303,7 +303,7 @@ export function DealsPage({
         </div>
       )}
 
-      {!loading && !error && !hideSamples && (
+      {!loading && !error && !hideSamples && deals.length > 0 && (
         <div className="controls filterbar">
           <label className="field">
             Sort
@@ -356,7 +356,15 @@ export function DealsPage({
           {error}. Is the backend running on <code>http://localhost:8000</code>?
         </p>
       )}
-      {!loading && !error && !hideSamples && <DealsTable deals={visible} onBuy={onBuy} />}
+      {!loading && !error && !hideSamples && deals.length > 0 && (
+        <DealsTable deals={visible} onBuy={onBuy} />
+      )}
+      {!loading && !error && !hideSamples && deals.length === 0 && (
+        <p className="empty">
+          No deals loaded — run a live eBay scan above (your eBay keys are in 🎉), or use “Check a
+          card”.
+        </p>
+      )}
       {!loading && !error && hideSamples && !scanned && (
         <p className="empty">
           Samples hidden. Use “Check a card” above, or run a live scan once your eBay keys are in.

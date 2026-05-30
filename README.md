@@ -29,6 +29,7 @@ so you can see and trust the money logic before wiring in live data.
 
 > 🆕 **New to all this?** Read [`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md) — a
 > dummy-proof, step-by-step guide to getting every API key and the app fully running.
+> Then [`docs/USING_THE_APP.md`](docs/USING_THE_APP.md) walks through actually using it.
 
 **Quickstart — one command** (creates the venv, installs deps, builds the dashboard, serves it):
 

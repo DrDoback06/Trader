@@ -27,7 +27,7 @@ from .api import settings as settings_api
 from .api import sources as sources_api
 from .config import get_settings
 from .db.base import init_db, make_engine, session_factory
-from .providers.factory import configure_app_providers
+from .providers.factory import build_browse_source, configure_app_providers
 from .services.credentials import CredentialStore
 from .services.demo import build_demo_deals, load_catalogue
 from .services.pipeline import PipelineConfig
@@ -77,8 +77,10 @@ def create_app() -> FastAPI:
     app.state.session_maker = session_factory(engine)
     # Selects live eBay-UK sold prices when configured, else the offline fixture.
     configure_app_providers(app)
-    # Start with demo deals so the dashboard has content before the first live scan.
-    app.state.deals = build_demo_deals(app.state.pipeline_cfg)
+    # Production-clean: only seed demo deals when there's no live listing source yet,
+    # so first-time users see a populated UI but a configured account starts empty.
+    live_listings = build_browse_source(app.state.credentials, app.state.settings) is not None
+    app.state.deals = [] if live_listings else build_demo_deals(app.state.pipeline_cfg)
     # Recent "Check a card" evaluations, so those can be added to the portfolio too.
     app.state.recent_evals = {}
 
