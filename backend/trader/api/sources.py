@@ -13,8 +13,10 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from ..core.models import Card, Game
 from ..providers.ebay_errors import ebay_error_detail
 from ..providers.factory import build_browse_source, configure_app_providers
+from ..providers.soldprice_rapidapi import RapidApiSoldPriceProvider, rapidapi_message
 from ..services.credentials import SECRET_FIELDS, CredentialStore
 from ..services.sources import SOURCES, SOURCES_BY_ID, SourceInfo
 from ..services.watchlist import POKEMON_SINGLES_GB
@@ -141,6 +143,44 @@ def test_ebay(request: Request) -> dict[str, Any]:
         return {"ok": False, "detail": f"Couldn't reach eBay for the category scan: {exc}"}
 
     return {"ok": True, "detail": "eBay keys work — keyword and category scans both pass. 🎉"}
+
+
+@router.post("/test/rapidapi")
+def test_rapidapi(request: Request) -> dict[str, Any]:
+    """Make one live sold-price call to check the RapidAPI key actually works, surfacing
+    RapidAPI's own error so it's clear whether the key (not the code) is the problem."""
+    store: CredentialStore = request.app.state.credentials
+    if not store.is_configured("rapidapi_key"):
+        return {"ok": False, "detail": "Enter your RapidAPI key first."}
+    settings = request.app.state.settings
+    provider = RapidApiSoldPriceProvider(
+        store.get("rapidapi_key"),
+        host=settings.rapidapi_soldprice_host,
+        site_id=settings.soldprice_site_id,
+    )
+    card = Card(
+        id="test", game=Game.POKEMON, set_code="", set_name="151", number="199/165",
+        name="Charizard ex",
+    )
+    try:
+        provider.get_valuation(card, "RAW_NM")
+    except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code
+        msg = rapidapi_message(exc)
+        quoted = f': "{msg}"' if msg else ""
+        if status in (401, 403):
+            return {
+                "ok": False,
+                "detail": (
+                    f"RapidAPI rejected the key (HTTP {status}{quoted}). Copy the X-RapidAPI-Key "
+                    "from the same app subscribed to 'eBay Average Selling Price' (open that API "
+                    "→ Endpoints tab → the key shown in the code snippet), paste it here and Save."
+                ),
+            }
+        return {"ok": False, "detail": f"RapidAPI error (HTTP {status}{quoted})."}
+    except httpx.HTTPError as exc:
+        return {"ok": False, "detail": f"Couldn't reach RapidAPI: {exc}"}
+    return {"ok": True, "detail": "RapidAPI sold-price key works — valuations are ready. 🎉"}
 
 
 def _key_reject_detail(exc: httpx.HTTPStatusError, client_id: str) -> str:

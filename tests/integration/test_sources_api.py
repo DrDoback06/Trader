@@ -76,3 +76,18 @@ def test_test_ebay_explains_category_sweep_limit(tmp_path: Path) -> None:
     assert body["ok"] is True  # keyword scans work — that's what the scanner uses
     assert "scour" in body["detail"].lower()
     assert "errorId 1100" in body["detail"]
+
+
+@respx.mock
+def test_test_rapidapi_surfaces_real_error(tmp_path: Path) -> None:
+    # A subscribed-but-wrong-app key 403s; show RapidAPI's own words, not a generic guess.
+    client = _client(tmp_path)
+    app.state.credentials.set_many({"rapidapi_key": "WRONG-APP-KEY"})
+    configure_app_providers(app)
+    respx.post("https://ebay-average-selling-price.p.rapidapi.com/findCompletedItems").mock(
+        return_value=httpx.Response(403, json={"message": "You are not subscribed to this API."})
+    )
+    body = client.post("/sources/test/rapidapi").json()
+    assert body["ok"] is False
+    assert "not subscribed" in body["detail"].lower()  # RapidAPI's real message, surfaced
+    assert "403" in body["detail"]

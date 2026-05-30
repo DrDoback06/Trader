@@ -58,6 +58,10 @@ export function testEbayKeys(): Promise<{ ok: boolean; detail: string }> {
   return request("/sources/test/ebay", { method: "POST" });
 }
 
+export function testRapidApiKey(): Promise<{ ok: boolean; detail: string }> {
+  return request("/sources/test/rapidapi", { method: "POST" });
+}
+
 export function setSourceEnabled(id: string, enabled: boolean): Promise<SourceState> {
   return request<SourceState>(`/sources/${id}`, {
     method: "PUT",

@@ -18,6 +18,7 @@ from ..core.models import BuyingFormat, Card, Deal, ListingFacts, ScanMode, Valu
 from ..identify.catalogue import Catalogue
 from ..providers.base import ListingSource, SoldPriceProvider
 from ..providers.ebay_errors import ebay_error_detail
+from ..providers.soldprice_rapidapi import rapidapi_message
 from .dedup import Dedup
 from .pipeline import PipelineConfig, run_pipeline
 from .quota import DailyQuota
@@ -89,12 +90,17 @@ _NO_SOLD_PRICES = _NoSoldPrices()
 
 
 def _valuation_error(exc: httpx.HTTPError) -> str:
-    if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code in (401, 403):
-        return (
-            "sold-price valuation unavailable — your RapidAPI key was rejected (401/403); "
-            "check it's correct and subscribed to the eBay Average Selling Price API"
-        )
-    return f"sold-price valuation unavailable — couldn't reach the service ({exc})"
+    if isinstance(exc, httpx.HTTPStatusError):
+        status = exc.response.status_code
+        msg = rapidapi_message(exc)
+        quoted = f': "{msg}"' if msg else ""
+        if status in (401, 403):
+            return (
+                f"sold-price valuation: RapidAPI rejected the key (HTTP {status}{quoted}). The key "
+                "must come from the same RapidAPI app subscribed to 'eBay Average Selling Price'"
+            )
+        return f"sold-price valuation failed (RapidAPI HTTP {status}{quoted})"
+    return f"sold-price valuation unavailable — couldn't reach RapidAPI ({exc})"
 
 
 def _ask_key(listing: ListingFacts) -> float:

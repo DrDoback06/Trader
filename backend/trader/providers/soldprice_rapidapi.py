@@ -19,6 +19,23 @@ from ..core.money import Money
 _DATE_FORMATS = ("%Y-%m-%d", "%d %b %Y", "%b %d, %Y", "%m/%d/%Y", "%Y-%m-%dT%H:%M:%S")
 
 
+def rapidapi_message(exc: httpx.HTTPError) -> str:
+    """RapidAPI's own error text (e.g. 'You are not subscribed to this API.'), so we can
+    show the real reason instead of guessing — the response body is usually {"message": ...}."""
+    response = getattr(exc, "response", None)
+    if response is None:
+        return ""
+    try:
+        body = response.json()
+        if isinstance(body, dict):
+            msg = body.get("message") or body.get("messages")
+            if msg:
+                return str(msg).strip()
+    except ValueError:
+        pass
+    return (response.text or "").strip()[:200]
+
+
 def _parse_date(value: Any) -> datetime | None:
     if not isinstance(value, str) or not value.strip():
         return None
