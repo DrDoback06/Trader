@@ -78,14 +78,12 @@ def build_sold_provider(
     return load_sold_provider()
 
 
-def build_alert_channel(settings: Settings) -> AlertChannel:
-    """Telegram when configured, else the console channel."""
-    if (
-        settings.alert_channel == "telegram"
-        and settings.telegram_bot_token
-        and settings.telegram_chat_id
-    ):
-        return TelegramAlertChannel(settings.telegram_bot_token, settings.telegram_chat_id)
+def build_alert_channel(credentials: CredentialStore, settings: Settings) -> AlertChannel:
+    """Telegram when its bot token + chat id are set (UI or env), else the console."""
+    token = credentials.get("telegram_bot_token") or settings.telegram_bot_token
+    chat = credentials.get("telegram_chat_id") or settings.telegram_chat_id
+    if token and chat:
+        return TelegramAlertChannel(token, chat)
     return ConsoleAlertChannel()
 
 
