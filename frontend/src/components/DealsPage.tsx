@@ -79,10 +79,12 @@ export function DealsPage({
 
   useEffect(() => load(), [load]);
 
-  // A card picked in the Browse tab pre-fills the "Check a card" box here.
+  // A card picked in the Browse tab pre-fills the box AND runs the live search for it,
+  // so tapping a card in Browse shows that card's real listings straight away.
   useEffect(() => {
     if (prefillQuery) {
       setCardQuery(prefillQuery);
+      onSearchCard(prefillQuery);
       onPrefillConsumed?.();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -141,8 +143,8 @@ export function DealsPage({
     }
   };
 
-  const onSearchCard = async () => {
-    const q = cardQuery.trim();
+  const onSearchCard = async (queryOverride?: string) => {
+    const q = (queryOverride ?? cardQuery).trim();
     if (q.length < 3) {
       setCheckMsg("Type or pick a card to search (3+ characters).");
       return;
@@ -279,7 +281,7 @@ export function DealsPage({
           <button className="primary" onClick={onCheck} disabled={checking}>
             {checking ? "Checking…" : "Check value"}
           </button>
-          <button className="bought" onClick={onSearchCard} disabled={searching}>
+          <button className="bought" onClick={() => onSearchCard()} disabled={searching}>
             {searching ? "Searching…" : "🔎 Search live listings"}
           </button>
           <label className="toggle">
