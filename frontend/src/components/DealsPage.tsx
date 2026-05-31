@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { buyDeal, evaluateCard, fetchDeals, runScan, searchCard } from "../api";
+import { buyDeal, evaluateCard, fetchDeals, runScan, searchCardListings } from "../api";
 import type { Deal } from "../types";
 import { DealsTable } from "./DealsTable";
 
@@ -42,7 +42,7 @@ export function DealsPage({
   const [error, setError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanMsg, setScanMsg] = useState<string | null>(null);
-  const [mode, setMode] = useState("everything");
+  const [mode, setMode] = useState("cheapest");
   const [hours, setHours] = useState(6);
   const [valueCap, setValueCap] = useState(250);
   const [scanned, setScanned] = useState(false);
@@ -61,14 +61,9 @@ export function DealsPage({
   const [postage, setPostage] = useState("");
   const [checking, setChecking] = useState(false);
   const [checkMsg, setCheckMsg] = useState<string | null>(null);
-
-  // "Search a card" — the hero: live eBay listings for one card, each valued
-  // against that exact card (clean identity), with wrong variants filtered out.
-  const [searchResults, setSearchResults] = useState<Deal[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchMaxPrice, setSearchMaxPrice] = useState("");
+  // "Search live listings" — a real eBay keyword search for the card in the box.
+  // One smart search: it reads the grade from each listing and auto-tries misspellings.
   const [searching, setSearching] = useState(false);
-  const [searchMsg, setSearchMsg] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -83,10 +78,12 @@ export function DealsPage({
 
   useEffect(() => load(), [load]);
 
-  // A card picked in the Browse tab pre-fills the "Search a card" box here.
+  // A card picked in the Browse tab pre-fills the box AND runs the live search for it,
+  // so tapping a card in Browse shows that card's real listings straight away.
   useEffect(() => {
     if (prefillQuery) {
-      setSearchQuery(prefillQuery);
+      setCardQuery(prefillQuery);
+      onSearchCard(prefillQuery);
       onPrefillConsumed?.();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -97,12 +94,15 @@ export function DealsPage({
     setScanMsg(null);
     try {
       const r = await runScan({ mode, ending_within_hours: hours, max_valuations: valueCap });
+      const errs = r.errors ?? [];
+      const warn = errs.length ? ` ⚠️ Some targets failed: ${errs.join(" · ")}` : "";
       setScanMsg(
         r.listings_seen === 0
-          ? "Scoured 0 listings — check your eBay keys are your PRODUCTION App ID / Cert ID (live scan uses production)."
+          ? "Scoured 0 listings — check your eBay keys are your PRODUCTION App ID / Cert ID (live scan uses production)." +
+              warn
           : `Scoured ${r.listings_seen} listings · ${r.new_listings} new · valued ${
               r.valued ?? r.new_listings
-            }${r.quota_exhausted ? " (daily call budget hit)" : ""}.`,
+            }${r.quota_exhausted ? " (daily call budget hit)" : ""}.` + warn,
       );
       setScanned(true);
       setHideSamples(false);
@@ -142,30 +142,28 @@ export function DealsPage({
     }
   };
 
-  const onSearch = async () => {
-    const q = searchQuery.trim();
+  const onSearchCard = async (queryOverride?: string) => {
+    const q = (queryOverride ?? cardQuery).trim();
     if (q.length < 3) {
-      setSearchMsg("Type a card name (and number) to search.");
+      setCheckMsg("Type or pick a card to search (3+ characters).");
       return;
     }
     setSearching(true);
-    setSearchMsg(null);
+    setCheckMsg(null);
+    setScanMsg(null);
     try {
-      const maxP = Number(searchMaxPrice);
-      const r = await searchCard({
-        query: q,
-        max_price: Number.isFinite(maxP) && maxP > 0 ? maxP : undefined,
-      });
-      setSearchResults(r.deals);
-      setSearchMsg(
-        r.listings_seen === 0
-          ? "No live listings found — check your eBay PRODUCTION keys, or try the exact name + number."
-          : `${r.matched} listing${r.matched === 1 ? "" : "s"} for ${r.card?.name ?? q}${
-              r.card?.number ? ` ${r.card.number}` : ""
-            } · ${r.valued} valued${r.quota_exhausted ? " (daily call budget hit)" : ""}.`,
+      const r = await searchCardListings({ query: q });
+      setScanned(true);
+      setHideSamples(false);
+      const errs = r.errors ?? [];
+      setScanMsg(
+        `Found ${r.listings_seen} live listing(s) for “${q}”${
+          r.valued ? ` · valued ${r.valued}` : ""
+        }.` + (errs.length ? ` ⚠️ ${errs.join(" · ")}` : ""),
       );
+      load();
     } catch (err: unknown) {
-      setSearchMsg(err instanceof Error ? err.message : "search failed");
+      setCheckMsg(err instanceof Error ? err.message : "search failed");
     } finally {
       setSearching(false);
     }
@@ -180,7 +178,7 @@ export function DealsPage({
     }
   };
 
-  const showHours = mode === "ending_soon" || mode === "everything";
+  const showHours = mode === "ending_soon";
   const showSamples = !scanned && !hideSamples && deals.length > 0;
 
   const visible = useMemo(() => {
@@ -228,64 +226,13 @@ export function DealsPage({
         </div>
       </section>
 
-      <div className="searchcard">
-        <h2>🔎 Search a card</h2>
-        <p className="sub">
-          The fast way in: type a card the way you'd search eBay (name + number) and get its live UK
-          listings, each valued against that exact card — wrong variants and junk filtered out.
-        </p>
-        <div className="controls">
-          <label className="field grow">
-            Card
-            <input
-              type="text"
-              placeholder="e.g. Charizard ex 199/165   ·   Pikachu 173/165"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") onSearch();
-              }}
-            />
-          </label>
-          <label className="field">
-            Max £ (inc P&amp;P)
-            <input
-              type="number"
-              min="0"
-              step="1"
-              value={searchMaxPrice}
-              onChange={(e) => setSearchMaxPrice(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") onSearch();
-              }}
-            />
-          </label>
-          <button className="primary" onClick={onSearch} disabled={searching}>
-            {searching ? "Searching…" : "Search eBay"}
-          </button>
-          {searchMsg && <span className="scanmsg">{searchMsg}</span>}
-        </div>
-        {searchResults.length > 0 && (
-          <>
-            <DealsTable deals={searchResults} onBuy={onBuy} />
-            <button
-              className="linkbtn"
-              onClick={() => {
-                setSearchResults([]);
-                setSearchMsg(null);
-              }}
-            >
-              Clear search
-            </button>
-          </>
-        )}
-      </div>
-
       <div className="checkcard">
-        <h2>Check a price</h2>
+        <h2>Check a card</h2>
         <p className="sub">
-          Already eyeing a listing? Put in its card and the price you'd pay for a quick verdict —
-          works with just your sold-price key, no eBay listing key needed.
+          Type a card the way you'd search eBay (or pick one from Browse). <strong>Check value</strong>{" "}
+          prices one purchase against UK sold data; <strong>Search live listings</strong> pulls every
+          live eBay listing of that card and ranks the underpriced ones — raw and graded alike (it
+          reads the grade from each listing; type "PSA 10" to focus on slabs).
         </p>
         <div className="controls">
           <label className="field grow">
@@ -329,6 +276,9 @@ export function DealsPage({
           <button className="primary" onClick={onCheck} disabled={checking}>
             {checking ? "Checking…" : "Check value"}
           </button>
+          <button className="bought" onClick={() => onSearchCard()} disabled={searching}>
+            {searching ? "Searching…" : "🔎 Search live listings"}
+          </button>
           {checkMsg && <span className="scanmsg">{checkMsg}</span>}
         </div>
         {checks.length > 0 && (
@@ -339,15 +289,6 @@ export function DealsPage({
             </button>
           </>
         )}
-      </div>
-
-      <div className="discovery">
-        <h2>🧭 Discovery — scour the whole category</h2>
-        <p className="sub">
-          No specific card in mind? Sweep eBay for the cheapest Buy-It-Nows, auctions ending soon,
-          typos, graded slabs and sealed boxes. These are broad scans — lower-confidence than a card
-          search above, so treat them as leads.
-        </p>
       </div>
 
       <div className="controls">
@@ -365,7 +306,6 @@ export function DealsPage({
         <label className="field">
           Scan
           <select value={mode} onChange={(e) => setMode(e.target.value)}>
-            <option value="everything">Everything (scour eBay)</option>
             <option value="cheapest">Cheapest BIN &amp; offers</option>
             <option value="ending_soon">Auctions ending soon</option>
             <option value="hidden_gems">Hidden gems (typos)</option>

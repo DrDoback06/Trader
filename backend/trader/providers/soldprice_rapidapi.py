@@ -8,6 +8,8 @@ Marketplace Insights API later if access is granted.
 
 from __future__ import annotations
 
+import time
+from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
@@ -17,6 +19,34 @@ from ..core.models import Card, Valuation
 from ..core.money import Money
 
 _DATE_FORMATS = ("%Y-%m-%d", "%d %b %Y", "%b %d, %Y", "%m/%d/%Y", "%Y-%m-%dT%H:%M:%S")
+
+
+def rapidapi_message(exc: httpx.HTTPError) -> str:
+    """RapidAPI's own error text (e.g. 'You are not subscribed to this API.'), so we can
+    show the real reason instead of guessing — the response body is usually {"message": ...}."""
+    response = getattr(exc, "response", None)
+    if response is None:
+        return ""
+    try:
+        body = response.json()
+        if isinstance(body, dict):
+            msg = body.get("message") or body.get("messages")
+            if msg:
+                return str(msg).strip()
+    except ValueError:
+        pass
+    return (response.text or "").strip()[:200]
+
+
+def _retry_after(resp: httpx.Response) -> float | None:
+    """Seconds to wait from a 429's ``Retry-After`` header, if present and numeric."""
+    raw = resp.headers.get("Retry-After")
+    if not raw:
+        return None
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        return None
 
 
 def _parse_date(value: Any) -> datetime | None:
@@ -59,6 +89,10 @@ class RapidApiSoldPriceProvider:
         max_results: int = 120,
         remove_outliers: bool = True,
         client: httpx.Client | None = None,
+        min_interval: float = 1.1,
+        max_retries: int = 3,
+        sleep: Callable[[float], None] = time.sleep,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self._key = api_key
         self._host = host
@@ -66,6 +100,13 @@ class RapidApiSoldPriceProvider:
         self._max_results = max_results
         self._remove_outliers = remove_outliers
         self._client = client or httpx.Client(timeout=25.0)
+        # BASIC RapidAPI plans cap requests *per second*; space calls out and back off on a
+        # 429 so a scan doesn't get every valuation rejected. Cache hits skip this entirely.
+        self._min_interval = min_interval
+        self._max_retries = max_retries
+        self._sleep = sleep
+        self._clock = clock
+        self._last_call = 0.0
 
     def _query(self, card: Card, condition_key: str) -> str:
         parts = [card.name, card.number]
@@ -86,6 +127,34 @@ class RapidApiSoldPriceProvider:
         except Exception:  # pragma: no cover - defensive against odd payloads
             return None
 
+    def _throttle(self) -> None:
+        if self._min_interval <= 0:
+            return
+        wait = self._min_interval - (self._clock() - self._last_call)
+        if wait > 0:
+            self._sleep(wait)
+
+    def _post(self, body: dict[str, Any]) -> httpx.Response:
+        """POST with a per-second throttle + retry/backoff on 429 (rate limit)."""
+        attempt = 0
+        while True:
+            self._throttle()
+            resp = self._client.post(
+                f"https://{self._host}/findCompletedItems",
+                headers={
+                    "x-rapidapi-key": self._key,
+                    "x-rapidapi-host": self._host,
+                    "content-type": "application/json",
+                },
+                json=body,
+            )
+            self._last_call = self._clock()
+            if resp.status_code == 429 and attempt < self._max_retries:
+                attempt += 1
+                self._sleep(_retry_after(resp) or min(self._min_interval * 2**attempt, 8.0))
+                continue
+            return resp
+
     def get_valuation(self, card: Card, condition_key: str) -> Valuation | None:
         body = {
             "keywords": self._query(card, condition_key),
@@ -94,15 +163,7 @@ class RapidApiSoldPriceProvider:
             "remove_outliers": self._remove_outliers,
             "excluded_keywords": "proxy fake repro reprint lot joblot bundle",
         }
-        resp = self._client.post(
-            f"https://{self._host}/findCompletedItems",
-            headers={
-                "x-rapidapi-key": self._key,
-                "x-rapidapi-host": self._host,
-                "content-type": "application/json",
-            },
-            json=body,
-        )
+        resp = self._post(body)
         resp.raise_for_status()
         data = resp.json()
 

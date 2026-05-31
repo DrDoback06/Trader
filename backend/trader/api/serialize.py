@@ -114,6 +114,7 @@ def ruleset_to_dict(r: RuleSet) -> dict[str, Any]:
         "total_budget": money_to_dict(r.total_budget),
         "max_spend_per_card": money_to_dict(r.max_spend_per_card),
         "min_profit": money_to_dict(r.min_profit),
+        "min_market_value": money_to_dict(r.min_market_value),
         "min_roi": r.min_roi,
         "min_margin": r.min_margin,
         "min_confidence": r.min_confidence,

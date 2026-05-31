@@ -111,6 +111,69 @@ def test_scan_values_only_cheapest_when_capped(catalogue: Any, sold_provider: An
 
 
 @respx.mock
+def test_scan_skips_failing_target_and_keeps_others(catalogue: Any, sold_provider: Any) -> None:
+    # A 403 on one target (e.g. eBay rejects a category sweep) must not throw away the
+    # listings other targets found — record the error and carry on.
+    respx.post(OAUTH).mock(
+        return_value=httpx.Response(200, json={"access_token": "T", "expires_in": 7200})
+    )
+    respx.get(f"{BROWSE}/item_summary/search").mock(
+        side_effect=[
+            httpx.Response(
+                403,
+                json={"errors": [{"errorId": 1100, "message": "Insufficient permissions."}]},
+            ),
+            httpx.Response(200, json={"itemSummaries": [_item("A")]}),
+        ]
+    )
+    src = EbayBrowseSource(EbayOAuth("id", "sec", OAUTH), BROWSE)
+    targets = [
+        WatchTarget(query="charizard", category_ids=("183454",), priority=5),
+        WatchTarget(query="pikachu", category_ids=("183454",), priority=1),
+    ]
+
+    result = scan(targets, src, catalogue, sold_provider, quota=DailyQuota(10))
+
+    assert len(result.errors) == 1
+    assert "errorId 1100" in result.errors[0]
+    assert result.listings_seen == 1  # second target still scoured a listing
+    assert result.new_listings == 1
+
+
+class _RejectingSoldProvider:
+    """A sold-price provider that 401s every lookup (e.g. a bad RapidAPI key)."""
+
+    name = "reject"
+
+    def get_valuation(self, card: Any, condition_key: str) -> Any:
+        request = httpx.Request("GET", "https://rapidapi.test/x")
+        raise httpx.HTTPStatusError(
+            "401", request=request, response=httpx.Response(401, request=request)
+        )
+
+
+@respx.mock
+def test_scan_returns_unvalued_listings_when_valuation_fails(catalogue: Any) -> None:
+    # eBay returns listings but the sold-price key is rejected — still surface the listings
+    # (unvalued) with a clear error, instead of throwing the whole scan away.
+    respx.post(OAUTH).mock(
+        return_value=httpx.Response(200, json={"access_token": "T", "expires_in": 7200})
+    )
+    respx.get(f"{BROWSE}/item_summary/search").mock(
+        return_value=httpx.Response(200, json={"itemSummaries": [_item("A")]})
+    )
+    src = EbayBrowseSource(EbayOAuth("id", "sec", OAUTH), BROWSE)
+    targets = [WatchTarget(query="charizard 199/165", category_ids=("183454",))]
+
+    result = scan(targets, src, catalogue, _RejectingSoldProvider(), quota=DailyQuota(10))
+
+    assert result.listings_seen == 1
+    assert result.deals  # the listing still comes back, just unvalued
+    assert result.valued == 0
+    assert any("RapidAPI" in e for e in result.errors)
+
+
+@respx.mock
 def test_scan_stops_at_quota(catalogue: Any, sold_provider: Any) -> None:
     respx.post(OAUTH).mock(
         return_value=httpx.Response(200, json={"access_token": "T", "expires_in": 7200})

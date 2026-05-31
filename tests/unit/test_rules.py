@@ -74,3 +74,22 @@ def test_category_whitelist(make_deal: Callable[..., Deal]) -> None:
     ok, reasons = evaluate(deal, RuleSet(category_whitelist=("183454",)))
     assert not ok
     assert any("category" in r for r in reasons)
+
+
+def test_min_market_value_filters_bulk(make_deal: Callable[..., Deal]) -> None:
+    # A card worth only £2 is bulk — fails the default £5 market-value floor.
+    deal = make_deal(profit=15, roi=0.6, margin=0.35, confidence=0.8, buy_cost=1, median=2.0)
+    ok, reasons = evaluate(deal, RuleSet())
+    assert not ok
+    assert any("bulk" in r for r in reasons)
+
+
+def test_exact_search_exempt_from_bulk_filter(make_deal: Callable[..., Deal]) -> None:
+    # When the user searched for this exact card, don't reject it for being cheap.
+    deal = make_deal(
+        profit=15, roi=0.6, margin=0.35, confidence=0.8, buy_cost=1, median=2.0,
+        flags=["EXACT_SEARCH"],
+    )
+    ok, reasons = evaluate(deal, RuleSet())
+    assert ok
+    assert not any("bulk" in r for r in reasons)

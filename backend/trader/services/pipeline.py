@@ -184,14 +184,17 @@ def evaluate_against_card(
 def resolve_searched_card(query: str, catalogue: Catalogue, cfg: PipelineConfig) -> Card:
     """Turn a typed search ("Charizard ex 199/165") into the card to value against.
 
-    Prefers the catalogue entry (canonical name / set / image → the best sold-price
-    query); falls back to a *clean* card built straight from the typed query when the
-    card isn't in the (optionally bundled) catalogue — never from a listing title.
+    When the query gives a card *number*, prefer the catalogue entry (canonical name /
+    set → the best sold-price query). When it has no number we can't pin a single
+    printing, so we value by name alone (a clean card with no number — which also makes
+    the number filter keep every name match). Either way the identity comes from the
+    typed query, never from a listing title.
     """
     parsed = parse_listing(query)
-    ident = identify(parsed, catalogue, ConditionBucket.RAW_NM, game=cfg.game, cfg=cfg.matcher)
-    if ident.card is not None:
-        return ident.card
+    if parsed.number:
+        ident = identify(parsed, catalogue, ConditionBucket.RAW_NM, game=cfg.game, cfg=cfg.matcher)
+        if ident.card is not None:
+            return ident.card
 
     name = parsed.name or query.strip()
     cid = "SEARCH:" + hashlib.sha1(query.strip().lower().encode()).hexdigest()[:12]

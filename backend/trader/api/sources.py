@@ -13,9 +13,13 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from ..core.models import Card, Game
+from ..providers.ebay_errors import ebay_error_detail
 from ..providers.factory import build_browse_source, configure_app_providers
+from ..providers.soldprice_rapidapi import RapidApiSoldPriceProvider, rapidapi_message
 from ..services.credentials import SECRET_FIELDS, CredentialStore
 from ..services.sources import SOURCES, SOURCES_BY_ID, SourceInfo
+from ..services.watchlist import POKEMON_SINGLES_GB
 
 router = APIRouter(prefix="/sources", tags=["sources"])
 
@@ -92,29 +96,105 @@ def clear_credential(request: Request, key: str) -> dict[str, Any]:
 
 @router.post("/test/ebay")
 def test_ebay(request: Request) -> dict[str, Any]:
-    """Make one tiny live Browse call to check the eBay keys actually work."""
+    """Check the eBay keys the way a live scan actually uses them.
+
+    A keyword search alone can pass on a keyset that still can't run the marketplace
+    "scour" — so we test both a keyword search *and* a category sweep (what the scan
+    does). That stops the button saying "ready to scan" when the scan will 403.
+    """
     store: CredentialStore = request.app.state.credentials
-    client_id = store.get("ebay_client_id")
+    client_id = store.get("ebay_client_id") or ""
     if not store.is_configured("ebay_client_id", "ebay_client_secret"):
         return {"ok": False, "detail": "Enter both your eBay App ID and Cert ID first."}
     source = build_browse_source(store, request.app.state.settings)
     if source is None:
         return {"ok": False, "detail": "Enable the 'eBay UK — Active listings' source first."}
+
+    # 1) Keyword search — the minimum a working keyset can do.
     try:
         source.fetch(query="charizard", limit=1)
     except httpx.HTTPStatusError as exc:
-        if exc.response.status_code in (401, 403):
-            if "SBX" in client_id.upper():
-                return {
-                    "ok": False,
-                    "detail": "These are SANDBOX keys (App ID has 'SBX'). Paste your "
-                    "PRODUCTION App ID + Cert ID (they contain 'PRD').",
-                }
-            return {"ok": False, "detail": "eBay rejected these keys (401/403)."}
-        return {"ok": False, "detail": f"eBay error {exc.response.status_code}."}
+        return {"ok": False, "detail": _key_reject_detail(exc, client_id)}
     except httpx.HTTPError as exc:
         return {"ok": False, "detail": f"Couldn't reach eBay: {exc}"}
-    return {"ok": True, "detail": "eBay keys work — you're ready to scan. 🎉"}
+
+    # 2) Category sweep — exactly what "Run live scan" does. This is where a keyset that
+    #    lacks Buy/Browse production access fails, even though step 1 passed.
+    try:
+        source.fetch(
+            category_ids=[POKEMON_SINGLES_GB],
+            buying_options=("FIXED_PRICE", "BEST_OFFER"),
+            sort="price",
+            limit=1,
+        )
+    except httpx.HTTPStatusError as exc:
+        real = ebay_error_detail(exc) or f"HTTP {exc.response.status_code}"
+        # Keyword scanning works — that's what the scanner uses on a standard keyset — so
+        # this isn't a blocker. The whole-category "scour" needs Buy API full access.
+        return {
+            "ok": True,
+            "detail": (
+                "Keys work for card-name scans — that's what the scanner uses, so you can scan "
+                f"now. 🎉 The whole-category 'scour' is limited by eBay ({real}); unlocking it "
+                "needs Buy API full access (Settings explains how)."
+            ),
+        }
+    except httpx.HTTPError as exc:
+        return {"ok": False, "detail": f"Couldn't reach eBay for the category scan: {exc}"}
+
+    return {"ok": True, "detail": "eBay keys work — keyword and category scans both pass. 🎉"}
+
+
+@router.post("/test/rapidapi")
+def test_rapidapi(request: Request) -> dict[str, Any]:
+    """Make one live sold-price call to check the RapidAPI key actually works, surfacing
+    RapidAPI's own error so it's clear whether the key (not the code) is the problem."""
+    store: CredentialStore = request.app.state.credentials
+    if not store.is_configured("rapidapi_key"):
+        return {"ok": False, "detail": "Enter your RapidAPI key first."}
+    settings = request.app.state.settings
+    provider = RapidApiSoldPriceProvider(
+        store.get("rapidapi_key"),
+        host=settings.rapidapi_soldprice_host,
+        site_id=settings.soldprice_site_id,
+    )
+    card = Card(
+        id="test", game=Game.POKEMON, set_code="", set_name="151", number="199/165",
+        name="Charizard ex",
+    )
+    try:
+        provider.get_valuation(card, "RAW_NM")
+    except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code
+        msg = rapidapi_message(exc)
+        quoted = f': "{msg}"' if msg else ""
+        if status in (401, 403):
+            return {
+                "ok": False,
+                "detail": (
+                    f"RapidAPI rejected the key (HTTP {status}{quoted}). Copy the X-RapidAPI-Key "
+                    "from the same app subscribed to 'eBay Average Selling Price' (open that API "
+                    "→ Endpoints tab → the key shown in the code snippet), paste it here and Save."
+                ),
+            }
+        return {"ok": False, "detail": f"RapidAPI error (HTTP {status}{quoted})."}
+    except httpx.HTTPError as exc:
+        return {"ok": False, "detail": f"Couldn't reach RapidAPI: {exc}"}
+    return {"ok": True, "detail": "RapidAPI sold-price key works — valuations are ready. 🎉"}
+
+
+def _key_reject_detail(exc: httpx.HTTPStatusError, client_id: str) -> str:
+    """Why eBay rejected the keyword search — eBay's own words, plus a sandbox hint."""
+    if exc.response.status_code in (401, 403):
+        if "SBX" in client_id.upper():
+            return (
+                "These are SANDBOX keys (App ID has 'SBX'). Paste your PRODUCTION App ID + "
+                "Cert ID (they contain 'PRD')."
+            )
+        real = ebay_error_detail(exc)
+        return f"eBay rejected these keys (401/403). {real}".strip()
+    real = ebay_error_detail(exc)
+    return f"eBay error {exc.response.status_code}. {real}".strip()
 
 
 @router.put("/{source_id}")

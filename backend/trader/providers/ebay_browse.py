@@ -49,6 +49,7 @@ class EbayBrowseSource:
         category_ids: Sequence[str] | None = None,
         buying_options: Sequence[str] = ("FIXED_PRICE",),
         max_price: float | None = None,
+        min_price: float | None = None,
         condition_ids: Sequence[str] | None = None,
         item_location_country: str = "GB",
         item_end_within_hours: float | None = None,
@@ -60,8 +61,10 @@ class EbayBrowseSource:
         filters: list[str] = []
         if buying_options:
             filters.append("buyingOptions:{" + "|".join(buying_options) + "}")
-        if max_price is not None:
-            filters.append(f"price:[..{max_price}]")
+        if min_price is not None or max_price is not None:
+            lo = "" if min_price is None else min_price
+            hi = "" if max_price is None else max_price
+            filters.append(f"price:[{lo}..{hi}]")
             filters.append("priceCurrency:GBP")
         if condition_ids:
             filters.append("conditionIds:{" + "|".join(condition_ids) + "}")

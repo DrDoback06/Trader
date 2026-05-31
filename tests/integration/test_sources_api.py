@@ -3,6 +3,8 @@ from __future__ import annotations
 import warnings
 from pathlib import Path
 
+import httpx
+import respx
 from fastapi.testclient import TestClient
 
 from trader.config import get_settings
@@ -44,3 +46,48 @@ def test_set_credentials_masks_and_activates(tmp_path: Path) -> None:
 def test_cannot_enable_unavailable_source(tmp_path: Path) -> None:
     resp = _client(tmp_path).put("/sources/pricecharting", json={"enabled": True})
     assert resp.status_code == 400
+
+
+@respx.mock
+def test_test_ebay_explains_category_sweep_limit(tmp_path: Path) -> None:
+    # Keys that pass a keyword search but fail the category 'scour' are still usable —
+    # keyword scanning is what the scanner uses — so report ok:True but explain the limit
+    # with eBay's own error, rather than a false "everything works".
+    client = _client(tmp_path)
+    app.state.credentials.set_many(
+        {"ebay_client_id": "App-PRD-1234", "ebay_client_secret": "PRD-secret"}
+    )
+    configure_app_providers(app)
+
+    respx.post("https://api.ebay.com/identity/v1/oauth2/token").mock(
+        return_value=httpx.Response(200, json={"access_token": "T", "expires_in": 7200})
+    )
+    respx.get("https://api.ebay.com/buy/browse/v1/item_summary/search").mock(
+        side_effect=[
+            httpx.Response(200, json={"itemSummaries": []}),  # keyword search OK
+            httpx.Response(  # category sweep rejected by eBay
+                403,
+                json={"errors": [{"errorId": 1100, "message": "Insufficient permissions."}]},
+            ),
+        ]
+    )
+
+    body = client.post("/sources/test/ebay").json()
+    assert body["ok"] is True  # keyword scans work — that's what the scanner uses
+    assert "scour" in body["detail"].lower()
+    assert "errorId 1100" in body["detail"]
+
+
+@respx.mock
+def test_test_rapidapi_surfaces_real_error(tmp_path: Path) -> None:
+    # A subscribed-but-wrong-app key 403s; show RapidAPI's own words, not a generic guess.
+    client = _client(tmp_path)
+    app.state.credentials.set_many({"rapidapi_key": "WRONG-APP-KEY"})
+    configure_app_providers(app)
+    respx.post("https://ebay-average-selling-price.p.rapidapi.com/findCompletedItems").mock(
+        return_value=httpx.Response(403, json={"message": "You are not subscribed to this API."})
+    )
+    body = client.post("/sources/test/rapidapi").json()
+    assert body["ok"] is False
+    assert "not subscribed" in body["detail"].lower()  # RapidAPI's real message, surfaced
+    assert "403" in body["detail"]

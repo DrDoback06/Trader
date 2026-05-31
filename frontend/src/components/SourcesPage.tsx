@@ -4,6 +4,7 @@ import {
   fetchSources,
   setSourceEnabled,
   testEbayKeys,
+  testRapidApiKey,
   updateCredentials,
 } from "../api";
 import type { SourcesResponse } from "../types";
@@ -55,6 +56,8 @@ export function SourcesPage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
   const [testMsg, setTestMsg] = useState<string | null>(null);
+  const [rapidTesting, setRapidTesting] = useState(false);
+  const [rapidMsg, setRapidMsg] = useState<string | null>(null);
 
   const load = () =>
     fetchSources()
@@ -105,6 +108,19 @@ export function SourcesPage() {
       setTestMsg(e instanceof Error ? e.message : "test failed");
     } finally {
       setTesting(false);
+    }
+  };
+
+  const testRapid = async () => {
+    setRapidTesting(true);
+    setRapidMsg(null);
+    try {
+      const r = await testRapidApiKey();
+      setRapidMsg((r.ok ? "✅ " : "❌ ") + r.detail);
+    } catch (e: unknown) {
+      setRapidMsg(e instanceof Error ? e.message : "test failed");
+    } finally {
+      setRapidTesting(false);
     }
   };
 
@@ -169,9 +185,26 @@ export function SourcesPage() {
         <button className="bought" onClick={testEbay} disabled={testing}>
           {testing ? "Testing…" : "Test eBay keys"}
         </button>
+        <button className="bought" onClick={testRapid} disabled={rapidTesting}>
+          {rapidTesting ? "Testing…" : "Test RapidAPI key"}
+        </button>
         {msg && <span className="scanmsg">{msg}</span>}
         {testMsg && <span className="scanmsg">{testMsg}</span>}
+        {rapidMsg && <span className="scanmsg">{rapidMsg}</span>}
       </div>
+      <p className="sub">
+        💡 A standard eBay keyset scans by <strong>card name</strong> straight away — that's what the
+        scanner uses. eBay's whole-category <em>“scour everything”</em> sweeps need{" "}
+        <strong>Buy API full access</strong>, granted via an{" "}
+        <a
+          href="https://developer.ebay.com/api-docs/buy/static/buy-requirements.html"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Application Growth Check
+        </a>
+        . You don't need it to start finding deals.
+      </p>
 
       <h2>Price sources</h2>
       <p className="sub">

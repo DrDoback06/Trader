@@ -29,6 +29,9 @@ class RuleSet:
     total_budget: Money = field(default_factory=lambda: Money(Decimal("300"), "GBP"))
     max_spend_per_card: Money = field(default_factory=lambda: Money(Decimal("60"), "GBP"))
     min_profit: Money = field(default_factory=lambda: Money(Decimal("3"), "GBP"))
+    # Ignore bulk: skip cards whose market value is below this (unless you searched for
+    # the exact card). Keeps category sweeps off £0.01 commons.
+    min_market_value: Money = field(default_factory=lambda: Money(Decimal("5"), "GBP"))
     min_roi: float = 0.25
     min_margin: float = 0.15
     min_confidence: float = 0.55
@@ -90,6 +93,17 @@ def evaluate(
 
     if rules.category_whitelist and deal.listing.category_id not in rules.category_whitelist:
         reasons.append("category not in whitelist")
+
+    # Bulk filter: a card worth less than this isn't worth our time (unless the user
+    # searched for it specifically — EXACT_SEARCH exempts it).
+    if (
+        deal.valuation is not None
+        and "EXACT_SEARCH" not in ident.parsed.flags
+        and deal.valuation.median < rules.min_market_value
+    ):
+        reasons.append(
+            f"market value {deal.valuation.median} below minimum {rules.min_market_value} (bulk)"
+        )
 
     # --- capital / thresholds ---
     if econ.buy_cost > rules.max_spend_per_card:

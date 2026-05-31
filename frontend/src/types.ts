@@ -96,6 +96,7 @@ export interface Rules {
   total_budget: Money;
   max_spend_per_card: Money;
   min_profit: Money;
+  min_market_value: Money;
   min_roi: number;
   min_margin: number;
   min_confidence: number;
@@ -145,6 +146,7 @@ export interface ScanResult {
   valued?: number;
   unvalued?: number;
   quota_exhausted: boolean;
+  errors?: string[];
   deals: Deal[];
 }
 

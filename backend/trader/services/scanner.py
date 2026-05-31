@@ -4,11 +4,6 @@ Runs watch targets against a listing source, de-duplicates, then pushes the new
 listings through the pipeline into ranked deals. Each target can be a specific
 card search (WATCH) or a whole-category "scour" (CHEAPEST / ENDING_SOON), and may
 sweep several pages within the daily call budget.
-
-:func:`scan` powers the category sweeps (Discovery): it identifies each listing
-from its own title. :func:`search_card` powers card search: it fetches listings
-for one typed card and values them all against that *known* card, so they come
-back priced instead of blank.
 """
 
 from __future__ import annotations
@@ -17,10 +12,14 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from ..core.models import BuyingFormat, Card, Deal, ListingFacts, ScanMode, WatchTarget
+import httpx
+
+from ..core.models import BuyingFormat, Card, Deal, ListingFacts, ScanMode, Valuation, WatchTarget
 from ..core.scoring import rank_deals
 from ..identify.catalogue import Catalogue
 from ..providers.base import ListingSource, SoldPriceProvider
+from ..providers.ebay_errors import ebay_error_detail
+from ..providers.soldprice_rapidapi import rapidapi_message
 from .dedup import Dedup
 from .pipeline import PipelineConfig, evaluate_against_card, run_pipeline
 from .quota import DailyQuota
@@ -36,6 +35,16 @@ class ScanResult:
     unvalued: int = 0
     quota_exhausted: bool = False
     deals: list[Deal] = field(default_factory=list)
+    # Per-target failures (e.g. eBay 403 on a category sweep) — collected rather than
+    # raised, so one bad target doesn't throw away the deals other targets found.
+    errors: list[str] = field(default_factory=list)
+
+
+def _target_label(target: WatchTarget) -> str:
+    if target.query:
+        return f'"{target.query}"'
+    cats = ",".join(target.category_ids) or "all"
+    return f"{target.mode} sweep (category {cats})"
 
 
 def _fetch_kwargs(target: WatchTarget) -> dict[str, Any]:
@@ -44,6 +53,7 @@ def _fetch_kwargs(target: WatchTarget) -> dict[str, Any]:
         "category_ids": list(target.category_ids) or None,
         "condition_ids": list(target.condition_ids) or None,
         "max_price": target.max_price,
+        "min_price": target.min_price,
     }
     if target.mode is ScanMode.CHEAPEST:
         return {
@@ -68,6 +78,33 @@ def _fetch_kwargs(target: WatchTarget) -> dict[str, Any]:
     }
 
 
+class _NoSoldPrices:
+    """A sold-price provider that values nothing — lets us still emit (unvalued) deals
+    when the real sold-price service is down, so the user at least sees the listings."""
+
+    name = "none"
+
+    def get_valuation(self, card: Card, condition_key: str) -> Valuation | None:
+        return None
+
+
+_NO_SOLD_PRICES = _NoSoldPrices()
+
+
+def _valuation_error(exc: httpx.HTTPError) -> str:
+    if isinstance(exc, httpx.HTTPStatusError):
+        status = exc.response.status_code
+        msg = rapidapi_message(exc)
+        quoted = f': "{msg}"' if msg else ""
+        if status in (401, 403):
+            return (
+                f"sold-price valuation: RapidAPI rejected the key (HTTP {status}{quoted}). The key "
+                "must come from the same RapidAPI app subscribed to 'eBay Average Selling Price'"
+            )
+        return f"sold-price valuation failed (RapidAPI HTTP {status}{quoted})"
+    return f"sold-price valuation unavailable — couldn't reach RapidAPI ({exc})"
+
+
 def _ask_key(listing: ListingFacts) -> float:
     """What you'd pay now (current bid for auctions, else price) + postage."""
     base = (
@@ -79,15 +116,22 @@ def _ask_key(listing: ListingFacts) -> float:
     return float(base.amount) + ship
 
 
-def _collect_new_listings(
+def scan(
     targets: Sequence[WatchTarget],
     source: ListingSource,
+    catalogue: Catalogue,
+    sold_provider: SoldPriceProvider,
     *,
     quota: DailyQuota,
-    dedup: Dedup,
-    result: ScanResult,
-) -> list[ListingFacts]:
-    """Fetch + de-duplicate within the daily call budget, updating ``result`` counters."""
+    dedup: Dedup | None = None,
+    cfg: PipelineConfig | None = None,
+    max_valuations: int = 0,
+    against_card: Card | None = None,
+) -> ScanResult:
+    cfg = cfg or PipelineConfig()
+    dedup = dedup or Dedup()
+    result = ScanResult()
+
     ordered = sorted((t for t in targets if t.enabled), key=lambda t: t.priority, reverse=True)
     new_listings: list[ListingFacts] = []
 
@@ -105,7 +149,16 @@ def _collect_new_listings(
             quota.spend(1)
             result.calls_used += 1
 
-            listings = source.fetch(offset=page * target.limit, **kwargs)
+            try:
+                listings = source.fetch(offset=page * target.limit, **kwargs)
+            except httpx.HTTPStatusError as exc:
+                detail = ebay_error_detail(exc) or f"HTTP {exc.response.status_code}"
+                result.errors.append(f"{_target_label(target)}: {detail}")
+                break  # skip this target's remaining pages; keep scanning the rest
+            except httpx.HTTPError as exc:
+                result.errors.append(f"{_target_label(target)}: could not reach eBay ({exc})")
+                break
+
             result.listings_seen += len(listings)
             for listing in listings:
                 if dedup.is_new(listing):
@@ -118,81 +171,45 @@ def _collect_new_listings(
             break
 
     result.new_listings = len(new_listings)
-    return new_listings
-
-
-def scan(
-    targets: Sequence[WatchTarget],
-    source: ListingSource,
-    catalogue: Catalogue,
-    sold_provider: SoldPriceProvider,
-    *,
-    quota: DailyQuota,
-    dedup: Dedup | None = None,
-    cfg: PipelineConfig | None = None,
-    max_valuations: int = 0,
-) -> ScanResult:
-    cfg = cfg or PipelineConfig()
-    dedup = dedup or Dedup()
-    result = ScanResult()
-
-    new_listings = _collect_new_listings(targets, source, quota=quota, dedup=dedup, result=result)
-
     # Cost guard: value only the cheapest N new listings (the likeliest steals); the
     # rest wait for a later scan (each valuation caches once fetched, so this is cheap).
     to_value = new_listings
     if max_valuations and len(to_value) > max_valuations:
         to_value = sorted(to_value, key=_ask_key)[:max_valuations]
-    result.valued = len(to_value)
-    result.unvalued = len(new_listings) - len(to_value)
-    result.deals = run_pipeline(to_value, catalogue, sold_provider, cfg)
+    try:
+        if against_card is not None:
+            result.deals = _value_against_card(to_value, against_card, sold_provider, cfg)
+            result.valued = sum(1 for d in result.deals if d.valuation is not None)
+            result.unvalued = len(result.deals) - result.valued
+        else:
+            result.deals = run_pipeline(to_value, catalogue, sold_provider, cfg)
+            result.valued = len(to_value)
+            result.unvalued = len(new_listings) - len(to_value)
+    except httpx.HTTPError as exc:
+        # The sold-price service failed (e.g. RapidAPI key rejected, or 429s exhausted).
+        # Still return the listings we found — unvalued — so the user sees them.
+        result.errors.append(_valuation_error(exc))
+        if against_card is not None:
+            result.deals = _value_against_card(to_value, against_card, _NO_SOLD_PRICES, cfg)
+            result.unvalued = len(result.deals)
+        else:
+            result.deals = run_pipeline(to_value, catalogue, _NO_SOLD_PRICES, cfg)
+            result.unvalued = len(new_listings)
+        result.valued = 0
     return result
 
 
-def search_card(
-    query: str,
+def _value_against_card(
+    to_value: list[ListingFacts],
     card: Card,
-    source: ListingSource,
     sold_provider: SoldPriceProvider,
-    *,
-    quota: DailyQuota,
-    cfg: PipelineConfig | None = None,
-    dedup: Dedup | None = None,
-    max_price: float | None = None,
-    limit: int = 100,
-    pages: int = 1,
-    category_ids: tuple[str, ...] = (),
-) -> ScanResult:
-    """Card search: fetch live listings for one typed card and value them all
-    against that *known* ``card`` (clean identity), dropping wrong variants.
-
-    Unlike :func:`scan`, every kept listing is valued — there's no per-listing cost
-    blow-up because the sold-price lookup caches per (card, condition), so a hundred
-    listings cost only a handful of sold-price calls.
-    """
-    cfg = cfg or PipelineConfig()
-    dedup = dedup or Dedup()
-    result = ScanResult()
-
-    target = WatchTarget(
-        query=query,
-        mode=ScanMode.WATCH,
-        category_ids=category_ids,
-        buying_options=("FIXED_PRICE", "BEST_OFFER", "AUCTION"),
-        sort="price",
-        max_price=max_price,
-        limit=limit,
-        pages=pages,
-    )
-    new_listings = _collect_new_listings([target], source, quota=quota, dedup=dedup, result=result)
-
-    deals: list[Deal] = []
-    for listing in new_listings:
-        deal = evaluate_against_card(listing, card, sold_provider, cfg)
-        if deal is not None:  # None => dropped (wrong variant / hard red flag)
-            deals.append(deal)
-
-    result.valued = sum(1 for d in deals if d.valuation is not None)
-    result.unvalued = len(deals) - result.valued
-    result.deals = rank_deals(deals)
-    return result
+    cfg: PipelineConfig,
+) -> list[Deal]:
+    """Card search: value every listing against the one known card (clean identity),
+    dropping wrong-number variants and hard-flagged listings, then rank."""
+    deals = [
+        d
+        for listing in to_value
+        if (d := evaluate_against_card(listing, card, sold_provider, cfg)) is not None
+    ]
+    return rank_deals(deals)

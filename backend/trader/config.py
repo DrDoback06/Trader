@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     ebay_oauth_base: str = "https://api.ebay.com/identity/v1/oauth2/token"
     ebay_browse_base: str = "https://api.ebay.com/buy/browse/v1"
     ebay_daily_call_budget: int = 4500
+    # eBay gates whole-category browsing (the "scour" sweeps) behind a Buy API
+    # Application Growth Check. A standard keyset can still run keyword card searches,
+    # so we default to keyword-only scanning and skip category sweeps until full access
+    # is granted. Set EBAY_BUY_API_FULL_ACCESS=true once eBay approves your keyset.
+    ebay_buy_api_full_access: bool = False
 
     # Phase 3 — sold-price valuation (eBay UK sold)
     rapidapi_key: str = ""

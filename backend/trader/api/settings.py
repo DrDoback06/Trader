@@ -13,7 +13,7 @@ from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 from ..core.money import Money
-from ..services.demo import build_demo_deals
+from ..core.rules import evaluate
 from .serialize import ruleset_to_dict
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -23,6 +23,7 @@ class RuleSetIn(BaseModel):
     total_budget: float | None = None
     max_spend_per_card: float | None = None
     min_profit: float | None = None
+    min_market_value: float | None = None
     min_roi: float | None = None
     min_margin: float | None = None
     min_confidence: float | None = None
@@ -44,6 +45,8 @@ def update_settings(request: Request, body: RuleSetIn) -> dict[str, Any]:
         rules.max_spend_per_card = Money.gbp(body.max_spend_per_card)
     if body.min_profit is not None:
         rules.min_profit = Money.gbp(body.min_profit)
+    if body.min_market_value is not None:
+        rules.min_market_value = Money.gbp(body.min_market_value)
     if body.min_roi is not None:
         rules.min_roi = body.min_roi
     if body.min_margin is not None:
@@ -55,6 +58,11 @@ def update_settings(request: Request, body: RuleSetIn) -> dict[str, Any]:
     if body.min_annualised_roi is not None:
         rules.min_annualised_roi = body.min_annualised_roi
 
-    # Re-run the pipeline so the dashboard reflects the new guardrails immediately.
-    request.app.state.deals = build_demo_deals(request.app.state.pipeline_cfg)
+    # Re-apply the guardrails to whatever deals are already loaded (live scan results or
+    # the demo set) so the dashboard updates immediately — without throwing live listings
+    # away and replacing them with samples.
+    for deal in request.app.state.deals:
+        passed, reasons = evaluate(deal, rules)
+        deal.passed_rules = passed
+        deal.rule_reasons = reasons
     return ruleset_to_dict(rules)
