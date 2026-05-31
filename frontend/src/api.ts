@@ -86,6 +86,20 @@ export function evaluateCard(input: EvaluateInput): Promise<Deal> {
   return request<Deal>("/evaluate", { method: "POST", body: JSON.stringify(input) });
 }
 
+export interface SearchResponse {
+  query: string;
+  card: { id: string; name: string; number: string; set_name: string; set_code: string } | null;
+  listings_seen: number;
+  matched: number;
+  valued: number;
+  quota_exhausted: boolean;
+  deals: Deal[];
+}
+
+export function searchCard(input: { query: string; max_price?: number }): Promise<SearchResponse> {
+  return request<SearchResponse>("/search", { method: "POST", body: JSON.stringify(input) });
+}
+
 export function fetchRules(): Promise<{ rules: Rules }> {
   return request("/settings");
 }

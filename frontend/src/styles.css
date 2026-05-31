@@ -528,6 +528,37 @@ table.srctable {
   margin-top: 12px;
 }
 
+/* "Search a card" — the hero panel */
+.searchcard {
+  background: var(--panel);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  padding: 18px 20px;
+  margin: 22px 0;
+  box-shadow: 0 0 0 1px rgba(76, 141, 255, 0.15);
+}
+
+.searchcard h2 {
+  font-size: 20px;
+  margin: 0 0 4px;
+}
+
+.searchcard .controls {
+  margin-top: 12px;
+}
+
+/* "Discovery" section divider */
+.discovery {
+  margin: 30px 0 12px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.discovery h2 {
+  font-size: 18px;
+  margin: 0 0 4px;
+}
+
 .linkbtn {
   background: none;
   border: none;

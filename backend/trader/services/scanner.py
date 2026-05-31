@@ -4,6 +4,11 @@ Runs watch targets against a listing source, de-duplicates, then pushes the new
 listings through the pipeline into ranked deals. Each target can be a specific
 card search (WATCH) or a whole-category "scour" (CHEAPEST / ENDING_SOON), and may
 sweep several pages within the daily call budget.
+
+:func:`scan` powers the category sweeps (Discovery): it identifies each listing
+from its own title. :func:`search_card` powers card search: it fetches listings
+for one typed card and values them all against that *known* card, so they come
+back priced instead of blank.
 """
 
 from __future__ import annotations
@@ -12,11 +17,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from ..core.models import BuyingFormat, Deal, ListingFacts, ScanMode, WatchTarget
+from ..core.models import BuyingFormat, Card, Deal, ListingFacts, ScanMode, WatchTarget
+from ..core.scoring import rank_deals
 from ..identify.catalogue import Catalogue
 from ..providers.base import ListingSource, SoldPriceProvider
 from .dedup import Dedup
-from .pipeline import PipelineConfig, run_pipeline
+from .pipeline import PipelineConfig, evaluate_against_card, run_pipeline
 from .quota import DailyQuota
 
 
@@ -73,21 +79,15 @@ def _ask_key(listing: ListingFacts) -> float:
     return float(base.amount) + ship
 
 
-def scan(
+def _collect_new_listings(
     targets: Sequence[WatchTarget],
     source: ListingSource,
-    catalogue: Catalogue,
-    sold_provider: SoldPriceProvider,
     *,
     quota: DailyQuota,
-    dedup: Dedup | None = None,
-    cfg: PipelineConfig | None = None,
-    max_valuations: int = 0,
-) -> ScanResult:
-    cfg = cfg or PipelineConfig()
-    dedup = dedup or Dedup()
-    result = ScanResult()
-
+    dedup: Dedup,
+    result: ScanResult,
+) -> list[ListingFacts]:
+    """Fetch + de-duplicate within the daily call budget, updating ``result`` counters."""
     ordered = sorted((t for t in targets if t.enabled), key=lambda t: t.priority, reverse=True)
     new_listings: list[ListingFacts] = []
 
@@ -118,6 +118,26 @@ def scan(
             break
 
     result.new_listings = len(new_listings)
+    return new_listings
+
+
+def scan(
+    targets: Sequence[WatchTarget],
+    source: ListingSource,
+    catalogue: Catalogue,
+    sold_provider: SoldPriceProvider,
+    *,
+    quota: DailyQuota,
+    dedup: Dedup | None = None,
+    cfg: PipelineConfig | None = None,
+    max_valuations: int = 0,
+) -> ScanResult:
+    cfg = cfg or PipelineConfig()
+    dedup = dedup or Dedup()
+    result = ScanResult()
+
+    new_listings = _collect_new_listings(targets, source, quota=quota, dedup=dedup, result=result)
+
     # Cost guard: value only the cheapest N new listings (the likeliest steals); the
     # rest wait for a later scan (each valuation caches once fetched, so this is cheap).
     to_value = new_listings
@@ -126,4 +146,53 @@ def scan(
     result.valued = len(to_value)
     result.unvalued = len(new_listings) - len(to_value)
     result.deals = run_pipeline(to_value, catalogue, sold_provider, cfg)
+    return result
+
+
+def search_card(
+    query: str,
+    card: Card,
+    source: ListingSource,
+    sold_provider: SoldPriceProvider,
+    *,
+    quota: DailyQuota,
+    cfg: PipelineConfig | None = None,
+    dedup: Dedup | None = None,
+    max_price: float | None = None,
+    limit: int = 100,
+    pages: int = 1,
+    category_ids: tuple[str, ...] = (),
+) -> ScanResult:
+    """Card search: fetch live listings for one typed card and value them all
+    against that *known* ``card`` (clean identity), dropping wrong variants.
+
+    Unlike :func:`scan`, every kept listing is valued — there's no per-listing cost
+    blow-up because the sold-price lookup caches per (card, condition), so a hundred
+    listings cost only a handful of sold-price calls.
+    """
+    cfg = cfg or PipelineConfig()
+    dedup = dedup or Dedup()
+    result = ScanResult()
+
+    target = WatchTarget(
+        query=query,
+        mode=ScanMode.WATCH,
+        category_ids=category_ids,
+        buying_options=("FIXED_PRICE", "BEST_OFFER", "AUCTION"),
+        sort="price",
+        max_price=max_price,
+        limit=limit,
+        pages=pages,
+    )
+    new_listings = _collect_new_listings([target], source, quota=quota, dedup=dedup, result=result)
+
+    deals: list[Deal] = []
+    for listing in new_listings:
+        deal = evaluate_against_card(listing, card, sold_provider, cfg)
+        if deal is not None:  # None => dropped (wrong variant / hard red flag)
+            deals.append(deal)
+
+    result.valued = sum(1 for d in deals if d.valuation is not None)
+    result.unvalued = len(deals) - result.valued
+    result.deals = rank_deals(deals)
     return result
