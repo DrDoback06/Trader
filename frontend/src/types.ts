@@ -63,6 +63,28 @@ export interface CatalogueCard {
   image_url: string;
 }
 
+export interface CollectionListing {
+  url: string;
+  item_id: string | null;
+  price: number | null;
+  source: string;
+}
+
+export interface CollectionEntry {
+  owned: number;
+  condition: string;
+  paid: number | null;
+  target_price: number | null;
+  for_sale: boolean;
+  notes: string;
+  listings: CollectionListing[];
+}
+
+export interface SealedPreset {
+  label: string;
+  query: string;
+}
+
 export interface SourceState {
   id: string;
   name: string;

@@ -1,11 +1,13 @@
 import type {
   Allocation,
   CatalogueCard,
+  CollectionEntry,
   Deal,
   Portfolio,
   RelistPreview,
   Rules,
   ScanResult,
+  SealedPreset,
   SetInfo,
   SourcesResponse,
   SourceState,
@@ -190,4 +192,52 @@ export function relistPreview(id: number): Promise<RelistPreview> {
     method: "POST",
     body: JSON.stringify({ publish: false }),
   });
+}
+
+// --- collection (owned cards + listings) ---
+
+export function fetchCollection(): Promise<{ cards: Record<string, CollectionEntry> }> {
+  return request("/collection");
+}
+
+// Card ids contain '/', so the id travels in the body/query, not the URL path.
+export function updateCollectionCard(
+  cardId: string,
+  patch: Partial<Omit<CollectionEntry, "listings">>,
+): Promise<CollectionEntry & { card_id: string }> {
+  return request("/collection/card", {
+    method: "PUT",
+    body: JSON.stringify({ card_id: cardId, ...patch }),
+  });
+}
+
+export function addCollectionListing(
+  cardId: string,
+  url: string,
+): Promise<CollectionEntry & { card_id: string }> {
+  return request("/collection/listings", {
+    method: "POST",
+    body: JSON.stringify({ card_id: cardId, url }),
+  });
+}
+
+export function removeCollectionListing(
+  cardId: string,
+  ref: string,
+): Promise<CollectionEntry & { card_id: string }> {
+  const qs = `card_id=${encodeURIComponent(cardId)}&ref=${encodeURIComponent(ref)}`;
+  return request(`/collection/listings?${qs}`, { method: "DELETE" });
+}
+
+export function importEbayListings(): Promise<{
+  found: number;
+  matched: number;
+  unmatched: string[];
+  note: string;
+}> {
+  return request("/collection/import/ebay", { method: "POST" });
+}
+
+export function fetchSealed(): Promise<{ sealed: SealedPreset[] }> {
+  return request("/catalogue/sealed");
 }

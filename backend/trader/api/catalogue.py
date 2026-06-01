@@ -20,6 +20,29 @@ def list_sets(request: Request) -> dict[str, Any]:
     return {"total_cards": len(cat), "sets": cat.sets()}
 
 
+# Sealed product isn't single cards, so it isn't in the card catalogue — offer a set of
+# ready-made searches the user can run (or value) like any card query.
+_SEALED_PRESETS: list[dict[str, str]] = [
+    {"label": "Booster box", "query": "pokemon booster box"},
+    {"label": "Elite Trainer Box (ETB)", "query": "pokemon elite trainer box"},
+    {"label": "Booster bundle", "query": "pokemon booster bundle"},
+    {"label": "151 booster box", "query": "pokemon 151 booster box"},
+    {"label": "151 ETB", "query": "pokemon 151 elite trainer box"},
+    {
+        "label": "Prismatic Evolutions ETB",
+        "query": "pokemon prismatic evolutions elite trainer box",
+    },
+    {"label": "Surging Sparks booster box", "query": "pokemon surging sparks booster box"},
+    {"label": "Booster bundle (single packs)", "query": "pokemon booster pack"},
+]
+
+
+@router.get("/sealed")
+def list_sealed(request: Request) -> dict[str, Any]:
+    """Ready-made sealed-product searches (boxes / ETBs / bundles) to run from Browse."""
+    return {"sealed": _SEALED_PRESETS}
+
+
 @router.get("/sets/{set_code}/cards")
 def set_cards(request: Request, set_code: str) -> dict[str, Any]:
     cat = request.app.state.catalogue

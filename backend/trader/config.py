@@ -74,6 +74,8 @@ class Settings(BaseSettings):
     credentials_path: str = ".trader/credentials.json"
     # Where the user's saved card-search list is persisted (local, gitignored).
     cardlist_path: str = ".trader/cardlist.json"
+    # Where the user's owned-card collection is persisted (local, gitignored).
+    collection_path: str = ".trader/collection.json"
 
     @property
     def ebay_configured(self) -> bool:

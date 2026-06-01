@@ -19,6 +19,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .api import alerts as alerts_api
 from .api import catalogue as catalogue_api
+from .api import collection as collection_api
 from .api import deals as deals_api
 from .api import health as health_api
 from .api import portfolio as portfolio_api
@@ -29,6 +30,7 @@ from .config import get_settings
 from .db.base import init_db, make_engine, session_factory
 from .providers.factory import build_browse_source, configure_app_providers
 from .services.cardlist import CardList
+from .services.collection import Collection
 from .services.credentials import CredentialStore
 from .services.demo import build_demo_deals, load_catalogue
 from .services.pipeline import PipelineConfig
@@ -72,6 +74,7 @@ def create_app() -> FastAPI:
     app.state.cardlist = CardList.create(
         Path(settings.cardlist_path), seed=default_card_queries()
     )
+    app.state.collection = Collection.create(Path(settings.collection_path))
     app.state.quota = DailyQuota(settings.ebay_daily_call_budget)
     app.state.credentials = CredentialStore.create(
         settings, DEFAULT_ENABLED, path=Path(settings.credentials_path)
@@ -108,6 +111,7 @@ def create_app() -> FastAPI:
     app.include_router(alerts_api.router)
     app.include_router(portfolio_api.router)
     app.include_router(catalogue_api.router)
+    app.include_router(collection_api.router)
 
     # Periodically scour + alert when SCAN_INTERVAL_MIN > 0 and eBay is configured.
     app.state.scheduler = start_scheduler(app)

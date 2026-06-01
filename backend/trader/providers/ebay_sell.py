@@ -45,6 +45,13 @@ class RelistResult:
     url: str | None
 
 
+def _to_float(value: Any) -> float | None:
+    try:
+        return float(value) if value not in (None, "") else None
+    except (TypeError, ValueError):
+        return None
+
+
 class EbaySellClient:
     name = "ebay_sell"
 
@@ -69,6 +76,49 @@ class EbaySellClient:
             "Content-Language": "en-GB",
             "X-EBAY-C-MARKETPLACE-ID": self._cfg.marketplace_id,
         }
+
+    def my_active_listings(self, *, limit: int = 200) -> list[dict[str, Any]]:
+        """The seller's own inventory offers, as ``{title, item_id, url, price, sku}``.
+
+        Honest limitation: the Sell *Inventory* API only returns offers created through
+        the API (createOffer/publishOffer) — listings made in eBay's normal web UI won't
+        appear here. The user can still add those as manual links. We page through
+        ``/offer`` and keep the published ones.
+        """
+        out: list[dict[str, Any]] = []
+        offset = 0
+        page = min(100, limit)
+        while len(out) < limit:
+            resp = self._client.get(
+                f"{self._base}/offer",
+                headers=self._headers(),
+                params={
+                    "marketplace_id": self._cfg.marketplace_id,
+                    "limit": page,
+                    "offset": offset,
+                },
+            )
+            resp.raise_for_status()
+            body = resp.json()
+            offers = body.get("offers") or []
+            for offer in offers:
+                listing_id = offer.get("listing", {}).get("listingId") or offer.get("listingId")
+                price = (offer.get("pricingSummary") or {}).get("price") or {}
+                title = (offer.get("listingDescription") or offer.get("sku") or "").strip()
+                url = f"https://www.ebay.co.uk/itm/{listing_id}" if listing_id else None
+                out.append(
+                    {
+                        "sku": offer.get("sku", ""),
+                        "item_id": str(listing_id) if listing_id else None,
+                        "title": title,
+                        "url": url,
+                        "price": _to_float(price.get("value")),
+                    }
+                )
+            if len(offers) < page:
+                break
+            offset += page
+        return out
 
     def relist(self, draft: ListingDraft, image_urls: Sequence[str]) -> RelistResult:
         # 1. Inventory item (the product + condition + quantity).
