@@ -23,7 +23,15 @@ if .venv/bin/python -c "import trader, sqlalchemy, apscheduler, fastapi, uvicorn
 else
   .venv/bin/pip install -q --timeout 120 --retries 10 --upgrade pip
   .venv/bin/pip install -q --timeout 120 --retries 10 -e ".[dev]"
-  # Show the real error (not a misleading "network" message) if it still won't import.
+  # A dropped download can leave a compiled package (e.g. pydantic-core) half-installed
+  # while pip still reports it satisfied. If the app won't import, re-fetch the compiled
+  # core packages fresh (no cache) before surfacing the real error.
+  if ! .venv/bin/python -c "import trader, sqlalchemy, apscheduler, fastapi, uvicorn" 2>/dev/null; then
+    echo "  a package looks half-installed - repairing (fresh download)…"
+    .venv/bin/pip install --force-reinstall --no-cache-dir --timeout 120 --retries 10 \
+      pydantic pydantic-core greenlet rapidfuzz
+  fi
+  # Surface the real error (not a misleading "network" message) if it STILL won't import.
   .venv/bin/python -c "import trader, sqlalchemy, apscheduler, fastapi, uvicorn"
 fi
 

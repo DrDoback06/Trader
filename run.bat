@@ -32,9 +32,15 @@ echo   Installing Python packages ^(needs internet the first time^)...
 ".venv\Scripts\python.exe" -m pip install --timeout 120 --retries 10 -e ".[dev]"
 ".venv\Scripts\python.exe" -c "import trader, sqlalchemy, apscheduler, fastapi, uvicorn" 2>nul
 if not errorlevel 1 goto :catalogue
+REM A dropped download can leave a package half-installed (its compiled binary
+REM missing) while pip still reports it "satisfied". Re-fetch the compiled core
+REM packages fresh (no cache) and re-check before giving up.
+echo   A package looks half-installed - repairing core packages ^(fresh download^)...
+".venv\Scripts\python.exe" -m pip install --force-reinstall --no-cache-dir --timeout 120 --retries 10 pydantic pydantic-core greenlet rapidfuzz
+".venv\Scripts\python.exe" -c "import trader, sqlalchemy, apscheduler, fastapi, uvicorn" 2>nul
+if not errorlevel 1 goto :catalogue
 echo.
-echo   Setup check failed. The real error is below ^(usually a missing package
-echo   from a dropped download - just run run.bat again to resume^):
+echo   Setup check still failing. The real error is below:
 ".venv\Scripts\python.exe" -c "import trader, sqlalchemy, apscheduler, fastapi, uvicorn"
 goto :deps_failed
 
