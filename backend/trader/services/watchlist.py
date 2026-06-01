@@ -130,6 +130,18 @@ def hidden_gem_targets(
     ]
 
 
+def default_card_queries() -> list[str]:
+    """Seed cards for the user-managed search list (the scan button runs each as a live
+    per-card search). Readable card names — the user edits these in the UI."""
+    return [
+        "Charizard ex 199/165",
+        "Blastoise ex 201/165",
+        "Pikachu 173/165",
+        "Mew ex 193/165",
+        "Venusaur ex 198/165",
+    ]
+
+
 def default_watchlist() -> list[WatchTarget]:
     return [
         WatchTarget(

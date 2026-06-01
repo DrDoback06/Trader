@@ -53,6 +53,7 @@ export function DealsTable({
           <th className="num">#</th>
           <th>Card</th>
           <th>Cond.</th>
+          <th>Lang.</th>
           <th>Type</th>
           <th className="r">Ask</th>
           <th className="r">Est. value</th>
@@ -128,6 +129,9 @@ export function DealsTable({
                 )}
               </td>
               <td>{condLabel(d)}</td>
+              <td className={d.language === "English" ? "lang" : "lang foreign"}>
+                {d.language === "English" ? "EN" : d.language}
+              </td>
               <td className="btype">
                 <span className="typebadge">{buyType(d)}</span>
                 {isAuction && ends ? <div className="sub">⏳ {ends}</div> : null}

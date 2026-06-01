@@ -28,13 +28,14 @@ from .api import sources as sources_api
 from .config import get_settings
 from .db.base import init_db, make_engine, session_factory
 from .providers.factory import build_browse_source, configure_app_providers
+from .services.cardlist import CardList
 from .services.credentials import CredentialStore
 from .services.demo import build_demo_deals, load_catalogue
 from .services.pipeline import PipelineConfig
 from .services.quota import DailyQuota
 from .services.scheduler import start_scheduler
 from .services.sources import DEFAULT_ENABLED
-from .services.watchlist import default_watchlist
+from .services.watchlist import default_card_queries, default_watchlist
 
 
 def _basic_auth_ok(header: str | None, password: str) -> bool:
@@ -68,6 +69,9 @@ def create_app() -> FastAPI:
     app.state.pipeline_cfg = PipelineConfig()
     app.state.catalogue = load_catalogue()
     app.state.watchlist = default_watchlist()
+    app.state.cardlist = CardList.create(
+        Path(settings.cardlist_path), seed=default_card_queries()
+    )
     app.state.quota = DailyQuota(settings.ebay_daily_call_budget)
     app.state.credentials = CredentialStore.create(
         settings, DEFAULT_ENABLED, path=Path(settings.credentials_path)

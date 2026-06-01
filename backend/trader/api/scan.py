@@ -18,7 +18,9 @@ from pydantic import BaseModel
 from ..core.models import Card, ListingFacts, WatchTarget
 from ..core.money import Money
 from ..core.rules import RuleSet
+from ..core.scoring import rank_deals
 from ..providers.factory import build_browse_source
+from ..services.dedup import Dedup
 from ..services.pipeline import PipelineConfig, evaluate_listing, resolve_searched_card
 from ..services.scanner import scan
 from ..services.trends import attach_trends, record_snapshots
@@ -112,6 +114,20 @@ def get_quota(request: Request) -> dict[str, Any]:
     return {"daily_budget": q.daily_budget, "used": q.used, "remaining": q.remaining}
 
 
+def _require_browse_source(request: Request) -> Any:
+    """The eBay Browse source, or a 400 explaining what to configure."""
+    source = build_browse_source(request.app.state.credentials, request.app.state.settings)
+    if source is None:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Live eBay UK scanning isn't ready. Enable the 'eBay UK — Active listings' "
+                "source and add your eBay API keys under Settings → Sources."
+            ),
+        )
+    return source
+
+
 def _execute_scan(
     request: Request,
     *,
@@ -126,15 +142,7 @@ def _execute_scan(
     set (card search) every listing is valued against that one card. eBay-fetch and
     sold-price failures are collected inside scan() (so partial results still come back),
     so this only hard-fails when eBay returned nothing at all."""
-    source = build_browse_source(request.app.state.credentials, request.app.state.settings)
-    if source is None:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "Live eBay UK scanning isn't ready. Enable the 'eBay UK — Active listings' "
-                "source and add your eBay API keys under Settings → Sources."
-            ),
-        )
+    source = _require_browse_source(request)
     result = scan(
         targets,
         source,
@@ -233,6 +241,17 @@ def _card_targets(
     ]
 
 
+def _card_search_cfg(request: Request, *, graded: bool) -> PipelineConfig:
+    """Pipeline config for an explicit card search: value any title (catalogue-free) and
+    never bulk-filter it (an explicit search is never 'bulk'). Graded searches surface
+    holds across all grades."""
+    exact_rules = replace(request.app.state.pipeline_cfg.rules, min_market_value=Money.gbp(0))
+    cfg = replace(request.app.state.pipeline_cfg, catalogue_free=True, rules=exact_rules)
+    if graded:
+        cfg = replace(cfg, rules=RuleSet.for_holds())
+    return cfg
+
+
 @router.post("/scan/card")
 def scan_card(request: Request, body: CardScanIn) -> dict[str, Any]:
     """Live-search eBay UK for one specific card — a keyword search, which works on a
@@ -241,11 +260,7 @@ def scan_card(request: Request, body: CardScanIn) -> dict[str, Any]:
     query = body.query.strip()
     if len(query) < 3:
         raise HTTPException(status_code=400, detail="Type a card to search (3+ characters).")
-    # An explicit card search is never "bulk" — drop the min-market-value floor.
-    exact_rules = replace(request.app.state.pipeline_cfg.rules, min_market_value=Money.gbp(0))
-    cfg = replace(request.app.state.pipeline_cfg, catalogue_free=True, rules=exact_rules)
-    if body.graded:
-        cfg = replace(cfg, rules=RuleSet.for_holds())
+    cfg = _card_search_cfg(request, graded=body.graded)
     targets = _card_targets(
         query,
         graded=body.graded,
@@ -263,6 +278,123 @@ def scan_card(request: Request, body: CardScanIn) -> dict[str, Any]:
         max_valuations=body.max_valuations,
         against_card=card,
     )
+
+
+class CardsScanIn(BaseModel):
+    graded: bool = False
+    max_price: float | None = None
+    max_valuations: int | None = None  # per card; else server default
+
+
+@router.post("/scan/cards")
+def scan_cards(request: Request, body: CardsScanIn | None = None) -> dict[str, Any]:
+    """Run the user's saved card list as a batch of per-card live searches — the same
+    keyword-search-and-value-against-the-card flow as the single-card box, one card after
+    another, sharing one daily-call budget and de-dup. Replaces the old whole-category
+    'scour' sweeps: only the cards the user curated, no marketplace-wide junk."""
+    body = body or CardsScanIn()
+    source = _require_browse_source(request)
+    queries = request.app.state.cardlist.all()
+    if not queries:
+        raise HTTPException(
+            status_code=400,
+            detail="Your card list is empty. Add cards to search (Browse → pick a card, "
+            "or type one in 'Check a card').",
+        )
+    cfg = _card_search_cfg(request, graded=body.graded)
+    catalogue = request.app.state.catalogue
+    dedup = Dedup()  # one de-dup across the whole batch, so a card seen twice is counted once
+    max_valuations = (
+        body.max_valuations
+        if body.max_valuations is not None
+        else request.app.state.settings.max_valuations_per_scan
+    )
+
+    merged: list[Any] = []
+    errors: list[str] = []
+    listings_seen = calls_used = valued = unvalued = 0
+    quota_exhausted = False
+    for query in queries:
+        if not request.app.state.quota.can_spend(1):
+            quota_exhausted = True
+            break
+        card = resolve_searched_card(query, catalogue, cfg)
+        result = scan(
+            _card_targets(
+                query, graded=body.graded, include_misspellings=False, max_price=body.max_price
+            ),
+            source,
+            catalogue,
+            request.app.state.sold_provider,
+            quota=request.app.state.quota,
+            dedup=dedup,
+            cfg=cfg,
+            max_valuations=max_valuations,
+            against_card=card,
+        )
+        merged.extend(result.deals)
+        errors.extend(result.errors)
+        listings_seen += result.listings_seen
+        calls_used += result.calls_used
+        valued += result.valued
+        unvalued += result.unvalued
+        if result.quota_exhausted:
+            quota_exhausted = True
+            break
+
+    deals = rank_deals(merged)
+    attach_trends(request.app.state.session_maker, deals)
+    record_snapshots(request.app.state.session_maker, deals)
+    request.app.state.deals = deals
+    return {
+        "mode": f"cards:{len(queries)}",
+        "targets_scanned": len(queries),
+        "calls_used": calls_used,
+        "listings_seen": listings_seen,
+        "new_listings": len(merged),
+        "valued": valued,
+        "unvalued": unvalued,
+        "quota_exhausted": quota_exhausted,
+        "errors": list(dict.fromkeys(errors)),
+        "deals": [deal_to_dict(d) for d in deals],
+    }
+
+
+# --- saved card-list management (the cards the scan button searches) -------------
+
+
+class CardListItem(BaseModel):
+    query: str
+
+
+class CardListReplace(BaseModel):
+    cards: list[str]
+
+
+@router.get("/cards")
+def get_cards(request: Request) -> dict[str, list[str]]:
+    return {"cards": request.app.state.cardlist.all()}
+
+
+@router.post("/cards")
+def add_card(request: Request, body: CardListItem) -> dict[str, list[str]]:
+    if not request.app.state.cardlist.add(body.query):
+        raise HTTPException(
+            status_code=400, detail="Card is already in the list, or is too short (3+ characters)."
+        )
+    return {"cards": request.app.state.cardlist.all()}
+
+
+@router.delete("/cards")
+def remove_card(request: Request, query: str) -> dict[str, list[str]]:
+    request.app.state.cardlist.remove(query)
+    return {"cards": request.app.state.cardlist.all()}
+
+
+@router.put("/cards")
+def replace_cards(request: Request, body: CardListReplace) -> dict[str, list[str]]:
+    request.app.state.cardlist.set_all(body.cards)
+    return {"cards": request.app.state.cardlist.all()}
 
 
 class EvaluateIn(BaseModel):

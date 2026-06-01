@@ -89,6 +89,34 @@ export function searchCardListings(input: CardSearchInput): Promise<ScanResult> 
   return request<ScanResult>("/scan/card", { method: "POST", body: JSON.stringify(input) });
 }
 
+export interface CardsScanOptions {
+  graded?: boolean;
+  max_price?: number;
+  max_valuations?: number;
+}
+
+// Run the saved card list as a batch of per-card live searches (the scan button).
+export function scanCards(opts: CardsScanOptions = {}): Promise<ScanResult> {
+  return request<ScanResult>("/scan/cards", { method: "POST", body: JSON.stringify(opts) });
+}
+
+export function fetchCards(): Promise<{ cards: string[] }> {
+  return request<{ cards: string[] }>("/cards");
+}
+
+export function addCard(query: string): Promise<{ cards: string[] }> {
+  return request<{ cards: string[] }>("/cards", {
+    method: "POST",
+    body: JSON.stringify({ query }),
+  });
+}
+
+export function removeCard(query: string): Promise<{ cards: string[] }> {
+  return request<{ cards: string[] }>(`/cards?query=${encodeURIComponent(query)}`, {
+    method: "DELETE",
+  });
+}
+
 export interface EvaluateInput {
   query: string;
   ask_price: number;

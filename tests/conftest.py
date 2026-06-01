@@ -38,6 +38,21 @@ def sold_provider() -> FixtureSoldPriceProvider:
     return FixtureSoldPriceProvider.from_file(PKG / "sample_data" / "sold_prices.json")
 
 
+@pytest.fixture(autouse=True)
+def _offline_sold_provider() -> Iterable[None]:
+    """Keep the shared app hermetic: the free pokemontcg.io price source is enabled by
+    default in production, so without this an unmocked app-level test would hit the live
+    network. Pin the offline fixture before each test; tests that need the real provider
+    mock the HTTP and call ``configure_app_providers(app)`` themselves (which runs after
+    this fixture and so takes precedence)."""
+    from trader.main import app
+
+    app.state.sold_provider = FixtureSoldPriceProvider.from_file(
+        PKG / "sample_data" / "sold_prices.json"
+    )
+    yield
+
+
 @pytest.fixture
 def make_deal() -> Callable[..., Deal]:
     """Factory for a fully-formed Deal with directly-controlled economics."""

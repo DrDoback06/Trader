@@ -26,6 +26,19 @@ class SourceInfo:
 
 SOURCES: list[SourceInfo] = [
     SourceInfo(
+        id="pokemontcg_market",
+        name="Free market price (pokemontcg.io)",
+        role="Market value",
+        region="EU/US",
+        currency="GBP",
+        requires=(),
+        signup_url="https://pokemontcg.io/",
+        accuracy="Free, no key — Cardmarket/TCGplayer reference price in GBP. A quick "
+        "is-this-underpriced gauge, not real eBay-UK sold prices.",
+        available=True,
+        default_enabled=True,
+    ),
+    SourceInfo(
         id="ebay_uk_sold",
         name="eBay UK — Sold prices",
         role="Market value",
@@ -33,7 +46,8 @@ SOURCES: list[SourceInfo] = [
         currency="GBP",
         requires=("rapidapi_key",),
         signup_url="https://rapidapi.com/ecommet/api/ebay-average-selling-price",
-        accuracy="Most accurate UK value — real eBay.co.uk sold prices (avg/median).",
+        accuracy="Most accurate UK value — real eBay.co.uk sold prices (avg/median). "
+        "Used first when keyed, with the free source as automatic fallback.",
         available=True,
         default_enabled=True,
     ),

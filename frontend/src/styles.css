@@ -722,3 +722,63 @@ button.bought {
 button.bought:hover {
   border-color: var(--accent);
 }
+
+/* Saved card list (the scan button searches these) */
+.cardlist {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin: 16px 0;
+}
+
+.cardlist h2 {
+  margin: 0 0 4px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 14px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 13px;
+}
+
+.chip .chipx {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  padding: 0;
+}
+
+.chip .chipx:hover {
+  color: var(--neg);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+/* Language badge in the deals table */
+td.lang {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+td.lang.foreign {
+  color: #f0b429;
+  font-weight: 600;
+}

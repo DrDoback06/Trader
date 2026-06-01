@@ -32,6 +32,26 @@ def test_disabling_sold_source_falls_back_to_fixture(tmp_path: Path) -> None:
     assert build_sold_provider(store, _settings()).name == "fixture"
 
 
+def test_free_market_source_used_when_enabled(tmp_path: Path) -> None:
+    # The free pokemontcg.io source needs no key — enabling it alone gives a real
+    # (cached) valuation provider instead of the offline fixture.
+    store = CredentialStore.create(_settings(), {"pokemontcg_market"}, path=tmp_path / "c.json")
+    provider = build_sold_provider(store, _settings())
+    assert isinstance(provider, CachingSoldPriceProvider)
+    assert provider.name == "pokemontcg_market"
+
+
+def test_chain_prefers_rapidapi_then_free(tmp_path: Path) -> None:
+    # Both enabled + RapidAPI keyed: accurate source first, free source as fallback.
+    store = CredentialStore.create(
+        _settings(), {"ebay_uk_sold", "pokemontcg_market"}, path=tmp_path / "c.json"
+    )
+    store.set_many({"rapidapi_key": "KEY1234abcd"})
+    provider = build_sold_provider(store, _settings())
+    assert isinstance(provider, CachingSoldPriceProvider)
+    assert provider.name == "chain"
+
+
 def test_browse_source_requires_enabled_and_keys(tmp_path: Path) -> None:
     store = CredentialStore.create(_settings(), set(), path=tmp_path / "c.json")
     assert build_browse_source(store, _settings()) is None  # source not enabled

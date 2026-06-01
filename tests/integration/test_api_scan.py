@@ -73,10 +73,32 @@ def test_scan_card_searches_specific_card_by_keyword(tmp_path: Path) -> None:
         route = respx.get("https://api.ebay.com/buy/browse/v1/item_summary/search").mock(
             return_value=httpx.Response(200, json={"itemSummaries": [item]})
         )
+        # The free pokemontcg.io market-price source is on by default — value the listing
+        # against a £90 Cardmarket reference so the deal gets an ROI (a £40 buy on a £90
+        # card is a clear steal), proving the no-key valuation path end-to-end.
+        respx.get("https://api.pokemontcg.io/v2/cards").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": [
+                        {
+                            "id": "mew-199",
+                            "name": "Charizard ex",
+                            "number": "199",
+                            "cardmarket": {"prices": {"trendPrice": 105.0, "lowPrice": 80.0}},
+                        }
+                    ]
+                },
+            )
+        )
 
         r = TestClient(app).post("/scan/card", json={"query": "Charizard ex 199/165"}).json()
         assert r["mode"] == "card:Charizard ex 199/165"
         assert r["listings_seen"] >= 1
+        assert r["valued"] >= 1  # the free market-price source produced a valuation
+        deal = r["deals"][0]
+        assert deal["valuation"]["provider"] == "pokemontcg_market"
+        assert deal["economics"] is not None and deal["economics"]["roi"] > 0
         # A keyword query with NO category browsing (works on a standard keyset).
         req = route.calls.last.request
         assert req.url.params["q"] == "Charizard ex 199/165"

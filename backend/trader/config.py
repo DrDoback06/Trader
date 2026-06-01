@@ -50,6 +50,13 @@ class Settings(BaseSettings):
     max_valuations_per_scan: int = 250
     pricecharting_api_key: str = ""
 
+    # Free market-price source (pokemontcg.io). No key needed; an optional key only
+    # raises the rate limit. FX rates convert its EUR/USD reference prices to GBP —
+    # approximate by design (a quick indicator, override if you want them tighter).
+    pokemontcg_api_key: str = ""
+    pokemontcg_eur_gbp: float = 0.85
+    pokemontcg_usd_gbp: float = 0.79
+
     # Wave 3 #10 — vision card ID (Claude API)
     anthropic_api_key: str = ""
     anthropic_vision_model: str = "claude-opus-4-8"
@@ -65,6 +72,8 @@ class Settings(BaseSettings):
 
     # Where UI-entered keys are persisted (local, gitignored, plaintext).
     credentials_path: str = ".trader/credentials.json"
+    # Where the user's saved card-search list is persisted (local, gitignored).
+    cardlist_path: str = ".trader/cardlist.json"
 
     @property
     def ebay_configured(self) -> bool:

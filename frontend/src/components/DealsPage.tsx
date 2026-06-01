@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { buyDeal, evaluateCard, fetchDeals, runScan, searchCardListings } from "../api";
+import {
+  addCard,
+  buyDeal,
+  evaluateCard,
+  fetchCards,
+  fetchDeals,
+  removeCard,
+  scanCards,
+  searchCardListings,
+} from "../api";
 import type { Deal } from "../types";
 import { DealsTable } from "./DealsTable";
 
@@ -42,16 +51,18 @@ export function DealsPage({
   const [error, setError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanMsg, setScanMsg] = useState<string | null>(null);
-  const [mode, setMode] = useState("cheapest");
-  const [hours, setHours] = useState(6);
   const [valueCap, setValueCap] = useState(250);
   const [scanned, setScanned] = useState(false);
   const [hideSamples, setHideSamples] = useState(false);
+
+  // The user's saved card list — the scan button runs a live per-card search for each.
+  const [cards, setCards] = useState<string[]>([]);
 
   // eBay-style filter / sort of the results (client-side).
   const [sortBy, setSortBy] = useState("best");
   const [fType, setFType] = useState("all");
   const [fCond, setFCond] = useState("all");
+  const [fLang, setFLang] = useState("all");
   const [fMax, setFMax] = useState("");
 
   // "Check a card" — a real valuation using your live sold-price key, no eBay key needed.
@@ -78,31 +89,42 @@ export function DealsPage({
 
   useEffect(() => load(), [load]);
 
-  // A card picked in the Browse tab pre-fills the box AND runs the live search for it,
-  // so tapping a card in Browse shows that card's real listings straight away.
+  // Load the saved card list once.
+  useEffect(() => {
+    fetchCards()
+      .then((r) => setCards(r.cards))
+      .catch(() => setCards([]));
+  }, []);
+
+  // A card picked in the Browse tab pre-fills the box, runs the live search for it, and
+  // adds it to the saved list — so tapping a card in Browse both shows its real listings
+  // and remembers it for the next batch scan.
   useEffect(() => {
     if (prefillQuery) {
       setCardQuery(prefillQuery);
       onSearchCard(prefillQuery);
+      onAddCard(prefillQuery);
       onPrefillConsumed?.();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefillQuery]);
 
+  // The scan button: run the saved card list as a batch of live per-card searches.
   const onScan = async () => {
+    if (cards.length === 0) {
+      setScanMsg("Your card list is empty — add cards below (or pick one from Browse).");
+      return;
+    }
     setScanning(true);
     setScanMsg(null);
     try {
-      const r = await runScan({ mode, ending_within_hours: hours, max_valuations: valueCap });
+      const r = await scanCards({ max_valuations: valueCap });
       const errs = r.errors ?? [];
-      const warn = errs.length ? ` ⚠️ Some targets failed: ${errs.join(" · ")}` : "";
+      const warn = errs.length ? ` ⚠️ ${errs.join(" · ")}` : "";
       setScanMsg(
-        r.listings_seen === 0
-          ? "Scoured 0 listings — check your eBay keys are your PRODUCTION App ID / Cert ID (live scan uses production)." +
-              warn
-          : `Scoured ${r.listings_seen} listings · ${r.new_listings} new · valued ${
-              r.valued ?? r.new_listings
-            }${r.quota_exhausted ? " (daily call budget hit)" : ""}.` + warn,
+        `Searched ${r.targets_scanned} card(s) · ${r.listings_seen} live listing(s) · valued ${
+          r.valued ?? r.new_listings
+        }${r.quota_exhausted ? " (daily call budget hit)" : ""}.` + warn,
       );
       setScanned(true);
       setHideSamples(false);
@@ -111,6 +133,26 @@ export function DealsPage({
       setScanMsg(err instanceof Error ? err.message : "scan failed");
     } finally {
       setScanning(false);
+    }
+  };
+
+  const onAddCard = async (query: string) => {
+    const q = query.trim();
+    if (q.length < 3) return;
+    try {
+      const r = await addCard(q);
+      setCards(r.cards);
+    } catch {
+      /* already in the list — ignore */
+    }
+  };
+
+  const onRemoveCard = async (query: string) => {
+    try {
+      const r = await removeCard(query);
+      setCards(r.cards);
+    } catch {
+      /* ignore */
     }
   };
 
@@ -178,7 +220,6 @@ export function DealsPage({
     }
   };
 
-  const showHours = mode === "ending_soon";
   const showSamples = !scanned && !hideSamples && deals.length > 0;
 
   const visible = useMemo(() => {
@@ -189,11 +230,15 @@ export function DealsPage({
       if (fType === "offer" && !d.listing.accepts_best_offer) return false;
       if (fCond === "graded" && !d.is_graded) return false;
       if (fCond === "raw" && d.is_graded) return false;
+      if (fLang === "en" && d.language !== "English") return false;
+      if (fLang === "foreign" && d.language === "English") return false;
       if (Number.isFinite(maxP) && maxP > 0 && effAsk(d) > maxP) return false;
       return true;
     });
-    return [...xs].sort(SORTERS[sortBy] ?? SORTERS.best);
-  }, [deals, fType, fCond, fMax, sortBy]);
+    // Stable tiebreaker (id) so the order is deterministic even when the primary key
+    // ties — e.g. before valuations land and every score/ROI is 0.
+    return [...xs].sort((a, b) => (SORTERS[sortBy] ?? SORTERS.best)(a, b) || a.id.localeCompare(b.id));
+  }, [deals, fType, fCond, fLang, fMax, sortBy]);
 
   const stats = useMemo(() => {
     const passing = deals.filter((d) => d.passed_rules);
@@ -279,6 +324,14 @@ export function DealsPage({
           <button className="bought" onClick={() => onSearchCard()} disabled={searching}>
             {searching ? "Searching…" : "🔎 Search live listings"}
           </button>
+          <button
+            className="linkbtn"
+            onClick={() => onAddCard(cardQuery)}
+            disabled={cardQuery.trim().length < 3}
+            title="Add this card to the list the scan button searches"
+          >
+            ➕ List
+          </button>
           {checkMsg && <span className="scanmsg">{checkMsg}</span>}
         </div>
         {checks.length > 0 && (
@@ -291,62 +344,64 @@ export function DealsPage({
         )}
       </div>
 
-      <div className="controls">
-        <label className="toggle">
-          <input
-            type="checkbox"
-            checked={onlyPassing}
-            onChange={(e) => setOnlyPassing(e.target.checked)}
-          />
-          Only deals that clear my buy rules
-        </label>
-
-        <span className="spacer" />
-
-        <label className="field">
-          Scan
-          <select value={mode} onChange={(e) => setMode(e.target.value)}>
-            <option value="cheapest">Cheapest BIN &amp; offers</option>
-            <option value="ending_soon">Auctions ending soon</option>
-            <option value="hidden_gems">Hidden gems (typos)</option>
-            <option value="graded">Graded slabs (PSA/CGC)</option>
-            <option value="sealed">Sealed boxes / ETBs</option>
-            <option value="watchlist">My watchlist cards</option>
-          </select>
-        </label>
-
-        {showHours && (
-          <label className="field">
-            ending within
-            <select value={hours} onChange={(e) => setHours(Number(e.target.value))}>
-              {[1, 2, 3, 6, 12].map((h) => (
-                <option key={h} value={h}>
-                  {h}h
-                </option>
-              ))}
-            </select>
+      <div className="cardlist">
+        <h2>My card list</h2>
+        <p className="sub">
+          The scan button runs a live eBay search for <strong>each</strong> of these cards and ranks
+          the underpriced ones — no marketplace-wide junk, just the cards you care about. Add cards
+          here, from <strong>Browse</strong>, or with <strong>➕ List</strong> in “Check a card”.
+        </p>
+        <div className="chips">
+          {cards.length === 0 && <span className="muted">No cards yet — add some below.</span>}
+          {cards.map((c) => (
+            <span key={c} className="chip">
+              {c}
+              <button
+                className="chipx"
+                title="Remove from list"
+                onClick={() => onRemoveCard(c)}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+        <div className="controls">
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={onlyPassing}
+              onChange={(e) => setOnlyPassing(e.target.checked)}
+            />
+            Only deals that clear my buy rules
           </label>
-        )}
 
-        <label className="field">
-          Value up to
-          <input
-            type="number"
-            min="1"
-            max="250"
-            value={valueCap}
-            onChange={(e) =>
-              setValueCap(Math.max(1, Math.min(250, Number(e.target.value) || 1)))
-            }
-            style={{ width: 64 }}
-            title="How many of the cheapest new listings to fetch a live value for this scan (caps RapidAPI calls)"
-          />
-        </label>
+          <span className="spacer" />
 
-        <button className="primary" onClick={onScan} disabled={scanning}>
-          {scanning ? "Scanning…" : "↻ Run live eBay scan"}
-        </button>
-        {scanMsg && <span className="scanmsg">{scanMsg}</span>}
+          <label className="field">
+            Value up to
+            <input
+              type="number"
+              min="1"
+              max="250"
+              value={valueCap}
+              onChange={(e) =>
+                setValueCap(Math.max(1, Math.min(250, Number(e.target.value) || 1)))
+              }
+              style={{ width: 64 }}
+              title="Per card: how many of the cheapest listings to fetch a live value for (caps API calls)"
+            />
+          </label>
+
+          <button
+            className="primary"
+            onClick={onScan}
+            disabled={scanning || cards.length === 0}
+          >
+            {scanning ? "Scanning…" : `↻ Scan my ${cards.length} card(s)`}
+          </button>
+          {scanMsg && <span className="scanmsg">{scanMsg}</span>}
+        </div>
       </div>
 
       {showSamples && (
@@ -388,6 +443,14 @@ export function DealsPage({
               <option value="all">Any</option>
               <option value="raw">Raw</option>
               <option value="graded">Graded</option>
+            </select>
+          </label>
+          <label className="field">
+            Language
+            <select value={fLang} onChange={(e) => setFLang(e.target.value)}>
+              <option value="all">Any</option>
+              <option value="en">English only</option>
+              <option value="foreign">Non-English</option>
             </select>
           </label>
           <label className="field">

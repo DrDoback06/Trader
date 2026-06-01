@@ -18,6 +18,8 @@ from .base import AlertChannel, SoldPriceProvider, VisionIdentifier
 from .ebay_browse import EbayBrowseSource
 from .ebay_oauth import EbayOAuth
 from .ebay_sell import EbaySellClient, SellConfig
+from .soldprice_chain import ChainSoldPriceProvider
+from .soldprice_pokemontcg import PokemonTcgPriceProvider
 from .soldprice_rapidapi import RapidApiSoldPriceProvider
 from .vision_claude import ClaudeVisionIdentifier
 
@@ -67,15 +69,37 @@ def build_browse_source(
 def build_sold_provider(
     credentials: CredentialStore, settings: Settings
 ) -> SoldPriceProvider:
-    """Live eBay-UK sold prices when configured + enabled, else the offline fixture."""
+    """Build the valuation source from enabled providers, most-accurate first.
+
+    Order: eBay-UK sold (RapidAPI, when keyed + enabled) → free pokemontcg.io market
+    price (when enabled). Chaining means a keyed user gets accurate UK sold prices but
+    *still* gets a free fallback value when RapidAPI returns nothing or is out of quota,
+    so the ROI columns are no longer blank. With nothing enabled we use the offline
+    fixture so the app and tests run with no network and no keys."""
+    providers: list[SoldPriceProvider] = []
     if credentials.is_enabled("ebay_uk_sold") and credentials.is_configured("rapidapi_key"):
-        inner = RapidApiSoldPriceProvider(
-            credentials.get("rapidapi_key"),
-            host=settings.rapidapi_soldprice_host,
-            site_id=settings.soldprice_site_id,
+        providers.append(
+            RapidApiSoldPriceProvider(
+                credentials.get("rapidapi_key"),
+                host=settings.rapidapi_soldprice_host,
+                site_id=settings.soldprice_site_id,
+            )
         )
-        return CachingSoldPriceProvider(inner, ttl_hours=settings.valuation_ttl_hours)
-    return load_sold_provider()
+    if credentials.is_enabled("pokemontcg_market"):
+        providers.append(
+            PokemonTcgPriceProvider(
+                api_key=settings.pokemontcg_api_key or None,
+                eur_gbp=settings.pokemontcg_eur_gbp,
+                usd_gbp=settings.pokemontcg_usd_gbp,
+            )
+        )
+
+    if not providers:
+        return load_sold_provider()
+    inner: SoldPriceProvider = (
+        providers[0] if len(providers) == 1 else ChainSoldPriceProvider(providers)
+    )
+    return CachingSoldPriceProvider(inner, ttl_hours=settings.valuation_ttl_hours)
 
 
 def build_alert_channel(credentials: CredentialStore, settings: Settings) -> AlertChannel:
