@@ -203,6 +203,10 @@ class Deal:
     grading: GradingResult | None = None  # raw -> slab grade-and-flip economics
     trend_pct: float | None = None  # market-value momentum vs recent history
     score: float = 0.0
+    gem_score: float = 0.0  # hidden-gem ranking — high value × low attention
+    active_listings_count: int | None = None  # competing eBay listings for this card
+    watchers: int | None = None  # listing-level watcher count (per-listing fetch)
+    attention_delta_7d: float | None = None  # external attention change (Trends / pokemontcg.io)
     passed_rules: bool = False
     rule_reasons: list[str] = field(default_factory=list)
 

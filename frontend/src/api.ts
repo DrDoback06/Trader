@@ -36,8 +36,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
-export function fetchDeals(onlyPassing: boolean): Promise<Deal[]> {
-  return request<Deal[]>(`/deals?only_passing=${onlyPassing}`);
+export function fetchDeals(
+  onlyPassing: boolean,
+  options: { mode?: string; withinHours?: number } = {},
+): Promise<Deal[]> {
+  const params = new URLSearchParams({ only_passing: String(onlyPassing) });
+  if (options.mode && options.mode !== "all") params.set("mode", options.mode);
+  if (options.withinHours != null) params.set("within_hours", String(options.withinHours));
+  return request<Deal[]>(`/deals?${params.toString()}`);
 }
 
 export function fetchSources(): Promise<SourcesResponse> {
@@ -94,6 +100,7 @@ export function searchCardListings(input: CardSearchInput): Promise<ScanResult> 
 
 export interface CardsScanOptions {
   graded?: boolean;
+  include_misspellings?: boolean;
   max_price?: number;
   max_valuations?: number;
 }

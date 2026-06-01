@@ -21,6 +21,7 @@ from ..core.rules import RuleSet
 from ..core.scoring import rank_deals
 from ..providers.factory import build_browse_source
 from ..services.dedup import Dedup
+from .gems import update_card_insights
 from ..services.pipeline import PipelineConfig, evaluate_listing, resolve_searched_card
 from ..services.scanner import scan
 from ..services.trends import attach_trends, record_snapshots
@@ -166,6 +167,9 @@ def _execute_scan(
     # Momentum: compare to prior history, then record today's sample.
     attach_trends(request.app.state.session_maker, result.deals)
     record_snapshots(request.app.state.session_maker, result.deals)
+    # Update the persistent per-card insights cache that drives the 💎 Hidden Gems
+    # tab and the Browse-tile badges (market value, gem score, listing count).
+    update_card_insights(request.app, result.deals)
     # Cache the freshly scanned deals so GET /deals reflects the live scan.
     request.app.state.deals = result.deals
     return {
@@ -282,6 +286,7 @@ def scan_card(request: Request, body: CardScanIn) -> dict[str, Any]:
 
 class CardsScanIn(BaseModel):
     graded: bool = False
+    include_misspellings: bool = False
     max_price: float | None = None
     max_valuations: int | None = None  # per card; else server default
 
@@ -321,7 +326,10 @@ def scan_cards(request: Request, body: CardsScanIn | None = None) -> dict[str, A
         card = resolve_searched_card(query, catalogue, cfg)
         result = scan(
             _card_targets(
-                query, graded=body.graded, include_misspellings=False, max_price=body.max_price
+                query,
+                graded=body.graded,
+                include_misspellings=body.include_misspellings,
+                max_price=body.max_price,
             ),
             source,
             catalogue,
@@ -345,6 +353,7 @@ def scan_cards(request: Request, body: CardsScanIn | None = None) -> dict[str, A
     deals = rank_deals(merged)
     attach_trends(request.app.state.session_maker, deals)
     record_snapshots(request.app.state.session_maker, deals)
+    update_card_insights(request.app, deals)
     request.app.state.deals = deals
     return {
         "mode": f"cards:{len(queries)}",

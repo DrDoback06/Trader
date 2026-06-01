@@ -49,7 +49,7 @@ def set_cards(request: Request, set_code: str) -> dict[str, Any]:
     cards = cat.cards_in_set(set_code)
     if not cards:
         raise HTTPException(status_code=404, detail="unknown or empty set")
-    insights = getattr(request.app.state, "card_insights", {})
+    insights = getattr(request.app.state, "card_insights", {}) or {}
     out = []
     for c in cards:
         info = insights.get(c.id) or {}

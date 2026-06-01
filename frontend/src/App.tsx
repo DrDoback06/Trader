@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { BrowsePage } from "./components/BrowsePage";
 import { DealsPage } from "./components/DealsPage";
+import { HiddenGemsPage } from "./components/HiddenGemsPage";
 import { PortfolioPage } from "./components/PortfolioPage";
 import { SettingsPage } from "./components/SettingsPage";
 import { SourcesPage } from "./components/SourcesPage";
 
-type View = "deals" | "browse" | "portfolio" | "settings" | "sources";
+type View = "deals" | "gems" | "browse" | "portfolio" | "settings" | "sources";
 
 export default function App() {
   const [view, setView] = useState<View>("deals");
@@ -28,6 +29,9 @@ export default function App() {
         <nav className="nav">
           <button className={view === "deals" ? "active" : ""} onClick={() => setView("deals")}>
             Deals
+          </button>
+          <button className={view === "gems" ? "active" : ""} onClick={() => setView("gems")}>
+            💎 Gems
           </button>
           <button className={view === "browse" ? "active" : ""} onClick={() => setView("browse")}>
             Browse
@@ -53,6 +57,7 @@ export default function App() {
       {view === "deals" && (
         <DealsPage prefillQuery={checkPrefill} onPrefillConsumed={() => setCheckPrefill(null)} />
       )}
+      {view === "gems" && <HiddenGemsPage onPick={pickCard} />}
       {view === "browse" && <BrowsePage onPick={pickCard} />}
       {view === "portfolio" && <PortfolioPage />}
       {view === "settings" && <SettingsPage />}

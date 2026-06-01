@@ -21,6 +21,7 @@ from .api import alerts as alerts_api
 from .api import catalogue as catalogue_api
 from .api import collection as collection_api
 from .api import deals as deals_api
+from .api import gems as gems_api
 from .api import health as health_api
 from .api import portfolio as portfolio_api
 from .api import scan as scan_api
@@ -90,6 +91,10 @@ def create_app() -> FastAPI:
     app.state.deals = [] if live_listings else build_demo_deals(app.state.pipeline_cfg)
     # Recent "Check a card" evaluations, so those can be added to the portfolio too.
     app.state.recent_evals = {}
+    # Cached per-card insights (market value, gem score, listing count) used by Browse
+    # tile badges and GET /gems. Populated incrementally by every scan via
+    # ``trader.api.gems.update_card_insights``.
+    app.state.card_insights = {}
 
     @app.middleware("http")
     async def require_password(request: Request, call_next):
@@ -112,6 +117,7 @@ def create_app() -> FastAPI:
     app.include_router(portfolio_api.router)
     app.include_router(catalogue_api.router)
     app.include_router(collection_api.router)
+    app.include_router(gems_api.router)
 
     # Periodically scour + alert when SCAN_INTERVAL_MIN > 0 and eBay is configured.
     app.state.scheduler = start_scheduler(app)

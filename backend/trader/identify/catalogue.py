@@ -47,6 +47,7 @@ class Catalogue:
     def __init__(self, cards: list[Card]) -> None:
         self.cards = cards
         self.set_meta: dict[str, dict[str, str]] = {}  # set_code -> {"image", "name"}
+        self._by_id: dict[str, Card] = {c.id: c for c in cards}
         self._by_game: dict[Game, list[Card]] = defaultdict(list)
         self._by_num: dict[tuple[Game, int], list[Card]] = defaultdict(list)
         self._by_name_token: dict[tuple[Game, str], list[Card]] = defaultdict(list)
@@ -60,6 +61,10 @@ class Catalogue:
 
     def __len__(self) -> int:
         return len(self.cards)
+
+    def get(self, card_id: str) -> Card | None:
+        """Look up a card by its catalogue id (used by ``GET /gems``)."""
+        return self._by_id.get(card_id)
 
     @classmethod
     def from_dir(cls, path: str | Path) -> Catalogue:

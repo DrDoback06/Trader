@@ -39,7 +39,7 @@ from ..core.models import (
 from ..core.rating import RatingConfig, annualised_roi, discount_vs_market
 from ..core.rating import sell_probability as compute_sell_probability
 from ..core.rules import RuleSet, evaluate
-from ..core.scoring import deal_score, rank_deals
+from ..core.scoring import compute_gem_score, deal_score, rank_deals
 from ..identify.catalogue import Catalogue, canon_number, numerator
 from ..identify.matcher import MatcherConfig, identify
 from ..identify.normalize import normalize_condition
@@ -287,6 +287,16 @@ def _value_and_score(
             )
 
     deal.score = deal_score(deal.economics, deal.confidence, deal.sell_probability)
+    deal.gem_score = compute_gem_score(
+        estimated_value=float(deal.economics.resale_gross.amount),
+        confidence=deal.confidence,
+        sell_probability=deal.sell_probability,
+        active_listings=deal.active_listings_count,
+        sample_size=valuation.sample_size,
+        trend_pct=deal.trend_pct,
+        watchers=deal.watchers,
+        attention_delta_7d=deal.attention_delta_7d,
+    )
 
     passed, reasons = evaluate(deal, cfg.rules)
     deal.passed_rules = passed

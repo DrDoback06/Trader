@@ -26,16 +26,15 @@ def deal_to_dict(deal: Deal) -> dict[str, Any]:
         gv = int(ident.grade_value) if float(ident.grade_value).is_integer() else ident.grade_value
         grade = f"{ident.grade_company.value} {gv}"
 
-    insights = getattr(deal, "_insights", None) or {}
     return {
         "id": deal.listing.external_id,
         "source": deal.listing.source,
         "passed_rules": deal.passed_rules,
         "score": deal.score,
-        "gem_score": getattr(deal, "gem_score", None),
-        "active_listings_count": insights.get("active_listings_count"),
-        "watchers": insights.get("watchers"),
-        "attention_delta_7d": insights.get("attention_delta_7d"),
+        "gem_score": round(deal.gem_score, 2) if deal.gem_score else None,
+        "active_listings_count": deal.active_listings_count,
+        "watchers": deal.watchers,
+        "attention_delta_7d": deal.attention_delta_7d,
         "confidence": round(deal.confidence, 3),
         "sell_probability": round(deal.sell_probability, 3),
         "sell_tier": sell_tier(deal.sell_probability).value,

@@ -55,6 +55,13 @@ export function DealsPage({
   const [valueCap, setValueCap] = useState(250);
   const [scanned, setScanned] = useState(false);
   const [hideSamples, setHideSamples] = useState(false);
+  // Run the user's saved card list through common misspellings on each scan — a
+  // wider net for listings competitors miss. Off by default (it doubles the
+  // calls), but on for any user willing to spend the budget on undiscovered listings.
+  const [includeMisspellings, setIncludeMisspellings] = useState(false);
+  // Deals sub-tab: "all" is the normal ranked list, "sniper" only auctions
+  // ending within the window (server-filtered).
+  const [tab, setTab] = useState<"all" | "sniper">("all");
 
   // The user's saved card list — the scan button runs a live per-card search for each.
   const [cards, setCards] = useState<string[]>([]);
@@ -79,14 +86,14 @@ export function DealsPage({
 
   const load = useCallback(() => {
     setLoading(true);
-    fetchDeals(onlyPassing)
+    fetchDeals(onlyPassing, { mode: tab, withinHours: tab === "sniper" ? 2 : undefined })
       .then((d) => {
         setDeals(d);
         setError(null);
       })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : "failed to load"))
       .finally(() => setLoading(false));
-  }, [onlyPassing]);
+  }, [onlyPassing, tab]);
 
   useEffect(() => load(), [load]);
 
@@ -119,7 +126,10 @@ export function DealsPage({
     setScanning(true);
     setScanMsg(null);
     try {
-      const r = await scanCards({ max_valuations: valueCap });
+      const r = await scanCards({
+        max_valuations: valueCap,
+        include_misspellings: includeMisspellings,
+      });
       const errs = r.errors ?? [];
       const warn = errs.length ? ` ⚠️ ${errs.join(" · ")}` : "";
       setScanMsg(
@@ -397,6 +407,18 @@ export function DealsPage({
             Only deals that clear my buy rules
           </label>
 
+          <label
+            className="toggle"
+            title="Also search common misspellings of each card name — finds listings competitors miss. Doubles the API calls per scan."
+          >
+            <input
+              type="checkbox"
+              checked={includeMisspellings}
+              onChange={(e) => setIncludeMisspellings(e.target.checked)}
+            />
+            🔤 Misspell sweep
+          </label>
+
           <span className="spacer" />
 
           <label className="field">
@@ -423,6 +445,22 @@ export function DealsPage({
           </button>
           {scanMsg && <span className="scanmsg">{scanMsg}</span>}
         </div>
+      </div>
+
+      <div className="controls dealtabs">
+        <button
+          className={tab === "all" ? "tab active" : "tab"}
+          onClick={() => setTab("all")}
+        >
+          All deals
+        </button>
+        <button
+          className={tab === "sniper" ? "tab active" : "tab"}
+          onClick={() => setTab("sniper")}
+          title="Live auctions ending within the next 2 hours — sorted by time-to-end"
+        >
+          ⏳ Sniper (≤2h)
+        </button>
       </div>
 
       {showSamples && (
