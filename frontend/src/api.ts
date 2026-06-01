@@ -14,7 +14,11 @@ import type {
   SourceState,
 } from "./types";
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
+// Empty default = same-origin fetches. The backend serves the built dashboard from
+// the same process, so /deals etc. resolve to whatever host:port the browser is on
+// (works on localhost, a LAN IP, a tunnel URL, anywhere). Set VITE_API_BASE only
+// during `npm run dev` when the frontend is on :5173 and the API on :8000.
+const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
