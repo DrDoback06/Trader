@@ -28,6 +28,33 @@ _ITEM = {
 
 
 @respx.mock
+def test_fetch_captures_search_total() -> None:
+    respx.post(OAUTH).mock(
+        return_value=httpx.Response(200, json={"access_token": "TKN", "expires_in": 7200})
+    )
+    respx.get(f"{BROWSE}/item_summary/search").mock(
+        return_value=httpx.Response(200, json={"total": 137, "itemSummaries": [_ITEM]})
+    )
+    src = EbayBrowseSource(EbayOAuth("id", "sec", OAUTH), BROWSE)
+    listings = src.fetch(query="charizard 199/165")
+    # The page behaves as a plain list, and also carries the market-saturation total.
+    assert len(listings) == 1
+    assert getattr(listings, "total", None) == 137
+
+
+@respx.mock
+def test_fetch_total_missing_is_none() -> None:
+    respx.post(OAUTH).mock(
+        return_value=httpx.Response(200, json={"access_token": "TKN", "expires_in": 7200})
+    )
+    respx.get(f"{BROWSE}/item_summary/search").mock(
+        return_value=httpx.Response(200, json={"itemSummaries": [_ITEM]})
+    )
+    src = EbayBrowseSource(EbayOAuth("id", "sec", OAUTH), BROWSE)
+    assert getattr(src.fetch(query="x"), "total", "missing") is None
+
+
+@respx.mock
 def test_fetch_builds_uk_request_and_parses() -> None:
     respx.post(OAUTH).mock(
         return_value=httpx.Response(200, json={"access_token": "TKN", "expires_in": 7200})

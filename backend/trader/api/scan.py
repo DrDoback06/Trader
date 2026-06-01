@@ -21,7 +21,12 @@ from ..core.rules import RuleSet
 from ..core.scoring import rank_deals
 from ..providers.factory import build_browse_source
 from ..services.dedup import Dedup
-from ..services.pipeline import PipelineConfig, evaluate_listing, resolve_searched_card
+from ..services.pipeline import (
+    PipelineConfig,
+    evaluate_listing,
+    finalize_gem_scores,
+    resolve_searched_card,
+)
 from ..services.scanner import scan
 from ..services.trends import attach_trends, record_snapshots
 from ..services.typos import misspellings
@@ -167,6 +172,9 @@ def _execute_scan(
     # Momentum: compare to prior history, then record today's sample.
     attach_trends(request.app.state.session_maker, result.deals)
     record_snapshots(request.app.state.session_maker, result.deals)
+    # Trend + active-listing count are now attached, so settle the gem scores before they
+    # feed the insights cache and GET /deals.
+    finalize_gem_scores(result.deals)
     # Update the persistent per-card insights cache that drives the 💎 Hidden Gems
     # tab and the Browse-tile badges (market value, gem score, listing count).
     update_card_insights(request.app, result.deals)
@@ -353,6 +361,7 @@ def scan_cards(request: Request, body: CardsScanIn | None = None) -> dict[str, A
     deals = rank_deals(merged)
     attach_trends(request.app.state.session_maker, deals)
     record_snapshots(request.app.state.session_maker, deals)
+    finalize_gem_scores(deals)
     update_card_insights(request.app, deals)
     request.app.state.deals = deals
     return {

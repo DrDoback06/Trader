@@ -5,7 +5,7 @@ from typing import Any
 import httpx
 import respx
 
-from trader.core.models import WatchTarget
+from trader.core.models import Card, Game, WatchTarget
 from trader.providers.ebay_browse import EbayBrowseSource
 from trader.providers.ebay_oauth import EbayOAuth
 from trader.services.quota import DailyQuota
@@ -50,6 +50,59 @@ def test_scan_dedups_and_produces_deals(catalogue: Any, sold_provider: Any) -> N
     assert result.listings_seen == 2
     assert result.new_listings == 1
     assert any(d.passed_rules for d in result.deals)
+
+
+_MEW_199 = Card(
+    id="POKEMON-MEW-199/165",
+    game=Game.POKEMON,
+    set_code="MEW",
+    set_name="151",
+    number="199/165",
+    name="Charizard ex",
+)
+
+
+@respx.mock
+def test_card_search_stamps_active_listings_count(catalogue: Any, sold_provider: Any) -> None:
+    respx.post(OAUTH).mock(
+        return_value=httpx.Response(200, json={"access_token": "T", "expires_in": 7200})
+    )
+    respx.get(f"{BROWSE}/item_summary/search").mock(
+        return_value=httpx.Response(200, json={"total": 88, "itemSummaries": [_item("A")]})
+    )
+    src = EbayBrowseSource(EbayOAuth("id", "sec", OAUTH), BROWSE)
+    result = scan(
+        [WatchTarget(query="charizard 199/165")],
+        src,
+        catalogue,
+        sold_provider,
+        quota=DailyQuota(10),
+        against_card=_MEW_199,
+    )
+    # The search matched 88 listings, so that's this card's active-listing count.
+    assert result.deals
+    assert all(d.active_listings_count == 88 for d in result.deals)
+
+
+@respx.mock
+def test_category_sweep_leaves_listing_count_none(catalogue: Any, sold_provider: Any) -> None:
+    respx.post(OAUTH).mock(
+        return_value=httpx.Response(200, json={"access_token": "T", "expires_in": 7200})
+    )
+    respx.get(f"{BROWSE}/item_summary/search").mock(
+        return_value=httpx.Response(200, json={"total": 88, "itemSummaries": [_item("A")]})
+    )
+    src = EbayBrowseSource(EbayOAuth("id", "sec", OAUTH), BROWSE)
+    # No against_card: a sweep mixes many cards, so the total isn't a per-card count.
+    result = scan(
+        [WatchTarget(query="charizard 199/165", category_ids=("183454",))],
+        src,
+        catalogue,
+        sold_provider,
+        quota=DailyQuota(10),
+    )
+    assert result.deals
+    assert all(d.active_listings_count is None for d in result.deals)
 
 
 def test_fetch_kwargs_per_mode() -> None:

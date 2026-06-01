@@ -134,6 +134,10 @@ def scan(
 
     ordered = sorted((t for t in targets if t.enabled), key=lambda t: t.priority, reverse=True)
     new_listings: list[ListingFacts] = []
+    # How many active listings the search(es) matched — the market-saturation signal.
+    # Across a card's targets (main query + misspelling variants) we keep the largest,
+    # which the correctly-spelled query supplies; pages of one search report the same total.
+    search_total: int | None = None
 
     for target in ordered:
         if not quota.can_spend(1):
@@ -158,6 +162,10 @@ def scan(
             except httpx.HTTPError as exc:
                 result.errors.append(f"{_target_label(target)}: could not reach eBay ({exc})")
                 break
+
+            page_total = getattr(listings, "total", None)
+            if isinstance(page_total, int):
+                search_total = page_total if search_total is None else max(search_total, page_total)
 
             result.listings_seen += len(listings)
             for listing in listings:
@@ -196,6 +204,12 @@ def scan(
             result.deals = run_pipeline(to_value, catalogue, _NO_SOLD_PRICES, cfg)
             result.unvalued = len(new_listings)
         result.valued = 0
+
+    # Card search values everything against one known card, so the search total is that
+    # card's active-listing count. (Category sweeps mix cards, so it isn't per-card there.)
+    if against_card is not None and search_total is not None:
+        for deal in result.deals:
+            deal.active_listings_count = search_total
     return result
 
 

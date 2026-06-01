@@ -287,21 +287,40 @@ def _value_and_score(
             )
 
     deal.score = deal_score(deal.economics, deal.confidence, deal.sell_probability)
-    deal.gem_score = compute_gem_score(
-        estimated_value=float(deal.economics.resale_gross.amount),
-        confidence=deal.confidence,
-        sell_probability=deal.sell_probability,
-        active_listings=deal.active_listings_count,
-        sample_size=valuation.sample_size,
-        trend_pct=deal.trend_pct,
-        watchers=deal.watchers,
-        attention_delta_7d=deal.attention_delta_7d,
-    )
+    deal.gem_score = gem_score_for_deal(deal)
 
     passed, reasons = evaluate(deal, cfg.rules)
     deal.passed_rules = passed
     deal.rule_reasons = reasons
     return deal
+
+
+def gem_score_for_deal(deal: Deal) -> float:
+    """Hidden-gem score from a deal's current signals (0 if it isn't valued).
+
+    Some inputs are only known *after* the pipeline runs — ``active_listings_count`` is
+    attached by the scanner from the search total, and ``trend_pct`` by ``attach_trends``
+    from price history. Call :func:`finalize_gem_scores` once those are set to fold them
+    in; ``watchers`` / ``attention_delta_7d`` stay neutral until a data source feeds them.
+    """
+    if deal.valuation is None or deal.economics is None:
+        return 0.0
+    return compute_gem_score(
+        estimated_value=float(deal.economics.resale_gross.amount),
+        confidence=deal.confidence,
+        sell_probability=deal.sell_probability,
+        active_listings=deal.active_listings_count,
+        sample_size=deal.valuation.sample_size,
+        trend_pct=deal.trend_pct,
+        watchers=deal.watchers,
+        attention_delta_7d=deal.attention_delta_7d,
+    )
+
+
+def finalize_gem_scores(deals: list[Deal]) -> None:
+    """Recompute gem scores after late signals (trend, active-listing count) are attached."""
+    for deal in deals:
+        deal.gem_score = gem_score_for_deal(deal)
 
 
 def run_pipeline(

@@ -40,16 +40,24 @@ def sold_provider() -> FixtureSoldPriceProvider:
 
 @pytest.fixture(autouse=True)
 def _offline_sold_provider() -> Iterable[None]:
-    """Keep the shared app hermetic: the free pokemontcg.io price source is enabled by
-    default in production, so without this an unmocked app-level test would hit the live
-    network. Pin the offline fixture before each test; tests that need the real provider
-    mock the HTTP and call ``configure_app_providers(app)`` themselves (which runs after
-    this fixture and so takes precedence)."""
+    """Keep the shared app hermetic and order-independent before each test.
+
+    Two pieces of shared ``app.state`` leak between tests on the singleton app:
+    - ``sold_provider``: the free pokemontcg.io source is enabled by default in
+      production, so without pinning the offline fixture an unmocked app-level test
+      would hit the live network. Tests that need the real provider mock the HTTP and
+      call ``configure_app_providers(app)`` themselves (runs after this, so wins).
+    - ``deals``: scan endpoints overwrite ``app.state.deals``. Restoring the demo deals
+      first means tests that buy/relist a seeded deal (id ``1001``) don't depend on
+      which scan test happened to run before them.
+    """
     from trader.main import app
+    from trader.services.demo import build_demo_deals
 
     app.state.sold_provider = FixtureSoldPriceProvider.from_file(
         PKG / "sample_data" / "sold_prices.json"
     )
+    app.state.deals = build_demo_deals(app.state.pipeline_cfg)
     yield
 
 

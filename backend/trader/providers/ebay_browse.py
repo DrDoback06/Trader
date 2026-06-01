@@ -22,6 +22,17 @@ from .ebay_oauth import EbayOAuth
 _MAX_LIMIT = 200
 
 
+class ListingPage(list[ListingFacts]):
+    """A page of listings that also carries eBay's reported ``total`` match count.
+
+    It *is* a ``list[ListingFacts]`` (so it satisfies the ``ListingSource`` protocol and
+    every existing caller is unchanged), but lets callers that want it read how many
+    active listings the search matched — the market-saturation signal for gem scoring.
+    """
+
+    total: int | None = None
+
+
 def _ebay_ts(value: datetime) -> str:
     return value.strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
@@ -98,7 +109,10 @@ class EbayBrowseSource:
         )
         resp.raise_for_status()
         data = resp.json()
-        return [self._to_listing(it) for it in data.get("itemSummaries", [])]
+        page = ListingPage(self._to_listing(it) for it in data.get("itemSummaries", []))
+        total = data.get("total")
+        page.total = int(total) if isinstance(total, int) else None
+        return page
 
     @staticmethod
     def _to_listing(it: dict[str, Any]) -> ListingFacts:
