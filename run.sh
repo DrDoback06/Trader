@@ -9,6 +9,9 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 PY="${PYTHON:-python3}"
+# Import the app the SAME way it launches below (backend on the path), so a flaky
+# editable install never makes a working app look "broken".
+export PYTHONPATH="$PWD/backend${PYTHONPATH:+:$PYTHONPATH}"
 
 echo "→ [1/3] Python environment"
 if [ ! -d .venv ]; then
@@ -20,6 +23,8 @@ if .venv/bin/python -c "import trader, sqlalchemy, apscheduler, fastapi, uvicorn
 else
   .venv/bin/pip install -q --timeout 120 --retries 10 --upgrade pip
   .venv/bin/pip install -q --timeout 120 --retries 10 -e ".[dev]"
+  # Show the real error (not a misleading "network" message) if it still won't import.
+  .venv/bin/python -c "import trader, sqlalchemy, apscheduler, fastapi, uvicorn"
 fi
 
 if [ "${1:-}" = "--catalogue" ]; then
