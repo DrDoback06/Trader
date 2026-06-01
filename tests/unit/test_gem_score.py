@@ -11,7 +11,6 @@ import math
 
 from trader.core.scoring import compute_gem_score
 
-
 # --- guards: bad inputs zero out ---------------------------------------------------
 
 def test_zero_value_means_zero_gem() -> None:

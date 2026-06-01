@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -21,7 +21,7 @@ def _ends_within(deal: Any, hours: float) -> bool:
         end = datetime.fromisoformat(end_iso.replace("Z", "+00:00"))
     except ValueError:
         return False
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     return now <= end <= now + timedelta(hours=hours)
 
 

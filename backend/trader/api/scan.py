@@ -21,7 +21,6 @@ from ..core.rules import RuleSet
 from ..core.scoring import rank_deals
 from ..providers.factory import build_browse_source
 from ..services.dedup import Dedup
-from .gems import update_card_insights
 from ..services.pipeline import PipelineConfig, evaluate_listing, resolve_searched_card
 from ..services.scanner import scan
 from ..services.trends import attach_trends, record_snapshots
@@ -33,6 +32,7 @@ from ..services.watchlist import (
     hidden_gem_targets,
     sealed_sweep_targets,
 )
+from .gems import update_card_insights
 from .serialize import deal_to_dict
 
 router = APIRouter(tags=["scan"])

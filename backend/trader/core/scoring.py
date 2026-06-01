@@ -55,11 +55,8 @@ def compute_gem_score(
     trend = 1.0 + max(trend_pct or 0.0, 0.0)
     liquidity = max(sell_probability, 0.1)  # don't zero illiquid niches
     attention = 1.0 + max(min(attention_delta_7d or 0.0, 1.0), 0.0)
-    if watchers is None:
-        watch_factor = 1.0
-    else:
-        # 0 watchers = 1.0, 25 watchers = 0.5, 50+ watchers = floor of 0.25.
-        watch_factor = max(0.25, 1.0 - watchers / 50.0)
+    # 0 watchers = 1.0, 25 watchers = 0.5, 50+ watchers = floor of 0.25; missing = neutral.
+    watch_factor = 1.0 if watchers is None else max(0.25, 1.0 - watchers / 50.0)
     return round(base * trend * liquidity * attention * watch_factor, 4)
 
 

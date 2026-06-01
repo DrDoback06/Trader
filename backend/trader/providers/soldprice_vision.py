@@ -37,10 +37,11 @@ _PROMPT_TEMPLATE = (
     "Condition bucket: {condition}\n"
     "{grading_note}"
     "Reply with ONLY a JSON object on a single line:\n"
-    '{{"median_gbp": <number>, "low_gbp": <number>, "high_gbp": <number>, "confidence": "low|medium|high"}}\n'
-    "Use median_gbp = your best single GBP estimate of the recent eBay UK sold price for this card in "
-    "this exact condition. Low/high should bracket plausible variation. If you genuinely do not know, "
-    'reply with {{"median_gbp": 0}}.'
+    '{{"median_gbp": <number>, "low_gbp": <number>, "high_gbp": <number>, '
+    '"confidence": "low|medium|high"}}\n'
+    "Use median_gbp = your best single GBP estimate of the recent eBay UK sold price for "
+    "this card in this exact condition. Low/high should bracket plausible variation. If you "
+    'genuinely do not know, reply with {{"median_gbp": 0}}.'
 )
 
 

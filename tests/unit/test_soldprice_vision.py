@@ -34,7 +34,8 @@ CARD = Card(
 
 def test_parse_response_extracts_median_low_high() -> None:
     parsed = _parse_response(
-        'sure thing — {"median_gbp": 95.5, "low_gbp": 80, "high_gbp": 120, "confidence": "medium"} here'
+        'sure thing — {"median_gbp": 95.5, "low_gbp": 80, '
+        '"high_gbp": 120, "confidence": "medium"} here'
     )
     assert parsed == (95.5, 80.0, 120.0)
 
