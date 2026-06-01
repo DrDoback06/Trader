@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  addCard,
   addCollectionListing,
+  fetchCards,
   fetchCollection,
   fetchSealed,
   fetchSetCards,
   fetchSets,
   importEbayListings,
+  removeCard,
   removeCollectionListing,
   updateCollectionCard,
 } from "../api";
@@ -39,6 +42,15 @@ export function BrowsePage({ onPick }: { onPick: (query: string) => void }) {
   const [importMsg, setImportMsg] = useState<string | null>(null);
   const [ownedOnly, setOwnedOnly] = useState(false);
 
+  // The user's saved card list (the "Watch this card" star membership).
+  const [watchList, setWatchList] = useState<Set<string>>(new Set());
+  const [watchMsg, setWatchMsg] = useState<string | null>(null);
+
+  // New Browse options: rarity filter + sort.
+  const [rarityFilter, setRarityFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<string>("number");
+  const [gemOnly, setGemOnly] = useState(false);
+
   useEffect(() => {
     fetchSets()
       .then((r) => {
@@ -52,7 +64,24 @@ export function BrowsePage({ onPick }: { onPick: (query: string) => void }) {
     fetchCollection()
       .then((r) => setCollection(r.cards))
       .catch(() => setCollection({}));
+    fetchCards()
+      .then((r) => setWatchList(new Set(r.cards)))
+      .catch(() => setWatchList(new Set()));
   }, []);
+
+  const queryFor = (c: CatalogueCard) => `${c.name} ${c.number}`;
+  const toggleWatch = async (c: CatalogueCard) => {
+    const q = queryFor(c);
+    const on = watchList.has(q);
+    try {
+      const r = on ? await removeCard(q) : await addCard(q);
+      setWatchList(new Set(r.cards));
+      setWatchMsg(on ? `Removed “${q}” from your list.` : `★ Added “${q}” to your list.`);
+      window.setTimeout(() => setWatchMsg((cur) => (cur && cur.includes(q) ? null : cur)), 2400);
+    } catch {
+      /* race or duplicate — ignore */
+    }
+  };
 
   const openSet = (s: SetInfo) => {
     setActive(s);
@@ -92,14 +121,37 @@ export function BrowsePage({ onPick }: { onPick: (query: string) => void }) {
     () => sets.filter((s) => s.set_name.toLowerCase().includes(setFilter.toLowerCase())),
     [sets, setFilter],
   );
-  const visibleCards = useMemo(
-    () =>
-      cards.filter((c) => {
-        if (ownedOnly && !(collection[c.id]?.owned > 0)) return false;
-        return `${c.name} ${c.number}`.toLowerCase().includes(cardFilter.toLowerCase());
-      }),
-    [cards, cardFilter, ownedOnly, collection],
-  );
+
+  const rarityOptions = useMemo(() => {
+    const seen = new Set<string>();
+    for (const c of cards) {
+      if (c.rarity) seen.add(c.rarity);
+    }
+    return Array.from(seen).sort();
+  }, [cards]);
+
+  const visibleCards = useMemo(() => {
+    const filtered = cards.filter((c) => {
+      if (ownedOnly && !(collection[c.id]?.owned > 0)) return false;
+      if (gemOnly && !(c.gem_score != null && c.gem_score > 0)) return false;
+      if (rarityFilter !== "all" && c.rarity !== rarityFilter) return false;
+      return `${c.name} ${c.number}`.toLowerCase().includes(cardFilter.toLowerCase());
+    });
+    const numKey = (c: CatalogueCard) => {
+      const n = parseInt(c.number.split("/")[0] ?? "", 10);
+      return Number.isFinite(n) ? n : 9999;
+    };
+    const cmp = {
+      number: (a: CatalogueCard, b: CatalogueCard) => numKey(a) - numKey(b),
+      name: (a: CatalogueCard, b: CatalogueCard) => a.name.localeCompare(b.name),
+      value: (a: CatalogueCard, b: CatalogueCard) =>
+        (b.market_value?.amount ?? -1) - (a.market_value?.amount ?? -1),
+      gem: (a: CatalogueCard, b: CatalogueCard) => (b.gem_score ?? -1) - (a.gem_score ?? -1),
+      rarity: (a: CatalogueCard, b: CatalogueCard) =>
+        (a.rarity ?? "").localeCompare(b.rarity ?? ""),
+    }[sortBy] ?? ((a: CatalogueCard, b: CatalogueCard) => numKey(a) - numKey(b));
+    return [...filtered].sort(cmp);
+  }, [cards, cardFilter, ownedOnly, collection, rarityFilter, sortBy, gemOnly]);
 
   if (error) {
     return <p className="error">{error}</p>;
@@ -186,11 +238,33 @@ export function BrowsePage({ onPick }: { onPick: (query: string) => void }) {
   // --- cards within a set ---
   return (
     <div className="browse">
-      <div className="controls">
+      <div className="controls filterbar">
         <button className="linkbtn" onClick={() => setActive(null)}>
           ← All sets
         </button>
-        <span className="spacer" />
+        <label className="field">
+          Sort
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+            <option value="number">Card number</option>
+            <option value="name">Name (A→Z)</option>
+            <option value="value">Market value (high → low)</option>
+            <option value="gem">Hidden-gem score</option>
+            <option value="rarity">Rarity</option>
+          </select>
+        </label>
+        {rarityOptions.length > 0 && (
+          <label className="field">
+            Rarity
+            <select value={rarityFilter} onChange={(e) => setRarityFilter(e.target.value)}>
+              <option value="all">Any</option>
+              {rarityOptions.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="toggle">
           <input
             type="checkbox"
@@ -198,6 +272,14 @@ export function BrowsePage({ onPick }: { onPick: (query: string) => void }) {
             onChange={(e) => setOwnedOnly(e.target.checked)}
           />
           Owned only
+        </label>
+        <label className="toggle" title="Show only cards flagged as potential underpriced finds">
+          <input
+            type="checkbox"
+            checked={gemOnly}
+            onChange={(e) => setGemOnly(e.target.checked)}
+          />
+          💎 Gems only
         </label>
         <label className="field grow">
           Find a card
@@ -209,9 +291,11 @@ export function BrowsePage({ onPick }: { onPick: (query: string) => void }) {
           />
         </label>
       </div>
+      {watchMsg && <p className="scanmsg watchtoast">{watchMsg}</p>}
       <h2>{active.set_name}</h2>
       <p className="sub">
-        {visibleCards.length} of {cards.length} cards · tap to value · ✎ to track ownership
+        {visibleCards.length} of {cards.length} cards · tap to value · ☆ to watch · ✎ to track
+        ownership
       </p>
       {loadingCards ? (
         <p className="empty">Loading…</p>
@@ -219,9 +303,49 @@ export function BrowsePage({ onPick }: { onPick: (query: string) => void }) {
         <div className="cardgrid">
           {visibleCards.map((c) => {
             const entry = collection[c.id] ?? EMPTY;
-            const query = `${c.name} ${c.number}`;
+            const query = queryFor(c);
+            const watching = watchList.has(query);
+            const isGem = c.gem_score != null && c.gem_score > 0;
+            const trendUp = c.trend_pct != null && c.trend_pct >= 0.05;
+            const trendDown = c.trend_pct != null && c.trend_pct <= -0.05;
             return (
-              <div key={c.id} className={`cardtile ${entry.owned > 0 ? "owned" : ""}`}>
+              <div
+                key={c.id}
+                className={`cardtile ${entry.owned > 0 ? "owned" : ""} ${isGem ? "gem" : ""}`}
+              >
+                <div className="badgerow">
+                  {isGem && (
+                    <span
+                      className="badge-gem"
+                      title={`Hidden-gem score ${c.gem_score!.toFixed(0)} — high value vs. listing saturation`}
+                    >
+                      💎 {c.gem_score!.toFixed(0)}
+                    </span>
+                  )}
+                  {c.market_value && (
+                    <span className="badge-value" title="Latest cached market value">
+                      {c.market_value.display}
+                    </span>
+                  )}
+                  {trendUp && (
+                    <span className="badge-trend up" title="Market value rising">
+                      🔥 {Math.round(c.trend_pct! * 100)}%
+                    </span>
+                  )}
+                  {trendDown && (
+                    <span className="badge-trend down" title="Market value falling">
+                      🔻 {Math.round(c.trend_pct! * 100)}%
+                    </span>
+                  )}
+                  {c.active_listings_count != null && c.active_listings_count > 0 && (
+                    <span
+                      className="badge-active"
+                      title="Active eBay listings right now"
+                    >
+                      🏷️ {c.active_listings_count}
+                    </span>
+                  )}
+                </div>
                 <button className="cardtap" title="Value this card" onClick={() => onPick(query)}>
                   {c.image_url ? (
                     <img src={c.image_url} alt="" loading="lazy" />
@@ -235,6 +359,17 @@ export function BrowsePage({ onPick }: { onPick: (query: string) => void }) {
                   </div>
                 </button>
                 <div className="ownbar">
+                  <button
+                    className={watching ? "watchbtn watchbtn-on" : "watchbtn"}
+                    onClick={() => toggleWatch(c)}
+                    title={
+                      watching
+                        ? "Remove from My card list"
+                        : "Add to My card list — the scan button finds future deals"
+                    }
+                  >
+                    {watching ? "★" : "☆"}
+                  </button>
                   <label className="ownqty" title="How many you own">
                     <input
                       type="number"

@@ -36,12 +36,42 @@ function endsIn(iso: string | null): string | null {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
+// Names the *reason* a deal's valuation/economics is blank, so the user gets a
+// real diagnosis instead of an opaque dash. Decision order matters: graded slabs
+// need real sold comps; the free pokemontcg fallback explicitly can't price them.
+function whyNoValuation(d: Deal): string {
+  if (d.valuation) {
+    return "Waiting on a fresh valuation — try a re-scan.";
+  }
+  if (d.is_graded) {
+    return (
+      "No sold comps for this graded slab. Add a RapidAPI key (Sources & Keys) for real " +
+      "PSA/CGC prices, or turn on the Claude rough-estimate fallback."
+    );
+  }
+  return (
+    "No sold comps in the last 90 days for this exact query. Try a broader card name, " +
+    "or wait for the free pokemontcg.io fallback (Sources & Keys → enable it)."
+  );
+}
+
+function valuationLabel(d: Deal): string | null {
+  if (!d.valuation) return null;
+  if (d.valuation.provider === "claude_estimate") return "est. (rough)";
+  if (d.valuation.provider === "pokemontcg_market") return "ref";
+  return null;
+}
+
 export function DealsTable({
   deals,
   onBuy,
+  watched,
+  onToggleWatch,
 }: {
   deals: Deal[];
   onBuy?: (id: string) => void;
+  watched?: Set<string>;
+  onToggleWatch?: (query: string, on: boolean) => void;
 }) {
   if (deals.length === 0) {
     return <p className="empty">No deals to show.</p>;
@@ -63,6 +93,7 @@ export function DealsTable({
           <th className="c">Sell-through</th>
           <th className="c">Match</th>
           <th className="c">Status</th>
+          <th className="c">Gem</th>
           <th></th>
         </tr>
       </thead>
@@ -147,13 +178,27 @@ export function DealsTable({
                   <>
                     {d.valuation.median.display}
                     <span className="sub"> n={d.valuation.sample_size}</span>
+                    {valuationLabel(d) && (
+                      <div
+                        className={`sub valbadge val-${d.valuation.provider}`}
+                        title={
+                          d.valuation.provider === "claude_estimate"
+                            ? "Claude rough estimate — not a real comp"
+                            : "pokemontcg.io market reference — not a real sold comp"
+                        }
+                      >
+                        {valuationLabel(d)}
+                      </div>
+                    )}
                   </>
                 ) : (
-                  "—"
+                  <span className="why" title={whyNoValuation(d)}>
+                    —
+                  </span>
                 )}
               </td>
               <td className={`r ${e ? (profitPos ? "pos" : "neg") : ""}`}>
-                {e ? e.profit.display : "—"}
+                {e ? e.profit.display : <span className="why" title={whyNoValuation(d)}>—</span>}
               </td>
               <td className="c">
                 {e ? (
@@ -168,7 +213,7 @@ export function DealsTable({
                     )}
                   </>
                 ) : (
-                  "—"
+                  <span className="why" title={whyNoValuation(d)}>—</span>
                 )}
               </td>
               <td className="c sub">{d.discount != null ? pct(d.discount) : "—"}</td>
@@ -197,6 +242,20 @@ export function DealsTable({
                   </span>
                 )}
               </td>
+              <td className="c gemcell">
+                {d.gem_score != null && d.gem_score > 0 ? (
+                  <span className="gemchip" title={`Hidden-gem score ${d.gem_score.toFixed(1)} — high ROI vs. listing competition`}>
+                    💎 {d.gem_score.toFixed(0)}
+                  </span>
+                ) : (
+                  <span className="sub">—</span>
+                )}
+                {d.active_listings_count != null && (
+                  <div className="sub" title="Active eBay listings for this card right now">
+                    🏷️ {d.active_listings_count}
+                  </div>
+                )}
+              </td>
               <td className="actions">
                 {d.listing.url ? (
                   <a className="buy" href={d.listing.url} target="_blank" rel="noreferrer">
@@ -212,6 +271,19 @@ export function DealsTable({
                     📌 Bought
                   </button>
                 )}
+                {onToggleWatch && d.card && (() => {
+                  const q = `${d.card!.name} ${d.card!.number}`;
+                  const on = watched?.has(q) ?? false;
+                  return (
+                    <button
+                      className={on ? "watchbtn watchbtn-on" : "watchbtn"}
+                      title={on ? "Remove from My card list" : "Add to My card list — scan finds future deals"}
+                      onClick={() => onToggleWatch(q, !on)}
+                    >
+                      {on ? "★ Watching" : "☆ Watch"}
+                    </button>
+                  );
+                })()}
               </td>
             </tr>
           );

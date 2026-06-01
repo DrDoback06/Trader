@@ -61,6 +61,11 @@ export interface CatalogueCard {
   rarity: string | null;
   finish: string | null;
   image_url: string;
+  market_value: Money | null;
+  gem_score: number | null;
+  active_listings_count: number | null;
+  trend_pct: number | null;
+  attention_delta_7d: number | null;
 }
 
 export interface CollectionListing {
@@ -185,6 +190,7 @@ export interface Deal {
   source: string;
   passed_rules: boolean;
   score: number;
+  gem_score: number | null;
   confidence: number;
   sell_probability: number;
   sell_tier: string;
@@ -203,8 +209,24 @@ export interface Deal {
   condition: string;
   language: string;
   flags: string[];
+  active_listings_count: number | null;
+  watchers: number | null;
+  attention_delta_7d: number | null;
   listing: Listing;
   valuation: Valuation | null;
   economics: Economics | null;
   rule_reasons: string[];
+}
+
+export interface GemCard {
+  card: CardRef;
+  image_url: string;
+  gem_score: number;
+  median: Money | null;
+  cheapest_listing: Money | null;
+  active_listings_count: number | null;
+  watchers: number | null;
+  attention_delta_7d: number | null;
+  trend_pct: number | null;
+  sample_size: number;
 }

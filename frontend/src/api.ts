@@ -3,6 +3,7 @@ import type {
   CatalogueCard,
   CollectionEntry,
   Deal,
+  GemCard,
   Portfolio,
   RelistPreview,
   Rules,
@@ -240,4 +241,21 @@ export function importEbayListings(): Promise<{
 
 export function fetchSealed(): Promise<{ sealed: SealedPreset[] }> {
   return request("/catalogue/sealed");
+}
+
+// --- hidden gems ---
+
+export interface GemsOptions {
+  limit?: number;
+  set_code?: string;
+  min_value?: number;
+}
+
+export function fetchGems(opts: GemsOptions = {}): Promise<{ gems: GemCard[]; threshold: number }> {
+  const params = new URLSearchParams();
+  if (opts.limit != null) params.set("limit", String(opts.limit));
+  if (opts.set_code) params.set("set_code", opts.set_code);
+  if (opts.min_value != null) params.set("min_value", String(opts.min_value));
+  const qs = params.toString();
+  return request(`/gems${qs ? `?${qs}` : ""}`);
 }

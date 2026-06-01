@@ -76,6 +76,19 @@ SOURCES: list[SourceInfo] = [
         default_enabled=False,
     ),
     SourceInfo(
+        id="vision_estimate",
+        name="Rough price estimate (Claude AI)",
+        role="Market value",
+        region="AI",
+        currency="GBP",
+        requires=("anthropic_api_key",),
+        signup_url="https://console.anthropic.com/",
+        accuracy="Last-resort estimate when sold comps and free market refs miss — e.g. graded "
+        "slabs. Flagged 'est. (rough)' in the UI; never use it as your only valuation.",
+        available=True,
+        default_enabled=False,
+    ),
+    SourceInfo(
         id="relist",
         name="eBay relist (Sell API)",
         role="Sell",

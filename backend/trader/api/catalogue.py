@@ -49,18 +49,25 @@ def set_cards(request: Request, set_code: str) -> dict[str, Any]:
     cards = cat.cards_in_set(set_code)
     if not cards:
         raise HTTPException(status_code=404, detail="unknown or empty set")
+    insights = getattr(request.app.state, "card_insights", {})
+    out = []
+    for c in cards:
+        info = insights.get(c.id) or {}
+        out.append({
+            "id": c.id,
+            "name": c.name,
+            "number": c.number,
+            "rarity": c.rarity,
+            "finish": c.finish,
+            "image_url": c.image_url,
+            "market_value": info.get("market_value"),
+            "gem_score": info.get("gem_score"),
+            "active_listings_count": info.get("active_listings_count"),
+            "trend_pct": info.get("trend_pct"),
+            "attention_delta_7d": info.get("attention_delta_7d"),
+        })
     return {
         "set_code": set_code,
         "set_name": cards[0].set_name,
-        "cards": [
-            {
-                "id": c.id,
-                "name": c.name,
-                "number": c.number,
-                "rarity": c.rarity,
-                "finish": c.finish,
-                "image_url": c.image_url,
-            }
-            for c in cards
-        ],
+        "cards": out,
     }

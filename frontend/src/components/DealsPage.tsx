@@ -11,6 +11,7 @@ import {
 } from "../api";
 import type { Deal } from "../types";
 import { DealsTable } from "./DealsTable";
+import { ValuationStatusBanner } from "./ValuationStatusBanner";
 
 // Total you'd pay right now (current bid for auctions, else price) + postage.
 function effAsk(d: Deal): number {
@@ -126,8 +127,12 @@ export function DealsPage({
           r.valued ?? r.new_listings
         }${r.quota_exhausted ? " (daily call budget hit)" : ""}.` + warn,
       );
-      setScanned(true);
-      setHideSamples(false);
+      // Only suppress the bundled demo rows once the live scan actually produced
+      // valuations — otherwise the user is left with a blank page and no signal.
+      if ((r.valued ?? 0) > 0) {
+        setScanned(true);
+        setHideSamples(false);
+      }
       load();
     } catch (err: unknown) {
       setScanMsg(err instanceof Error ? err.message : "scan failed");
@@ -142,6 +147,7 @@ export function DealsPage({
     try {
       const r = await addCard(q);
       setCards(r.cards);
+      setScanMsg(`★ Added "${q}" to your card list.`);
     } catch {
       /* already in the list — ignore */
     }
@@ -154,6 +160,12 @@ export function DealsPage({
     } catch {
       /* ignore */
     }
+  };
+
+  const watched = useMemo(() => new Set(cards), [cards]);
+  const toggleWatch = (query: string, on: boolean) => {
+    if (on) onAddCard(query);
+    else onRemoveCard(query);
   };
 
   const onCheck = async () => {
@@ -195,14 +207,17 @@ export function DealsPage({
     setScanMsg(null);
     try {
       const r = await searchCardListings({ query: q });
-      setScanned(true);
-      setHideSamples(false);
       const errs = r.errors ?? [];
       setScanMsg(
         `Found ${r.listings_seen} live listing(s) for “${q}”${
           r.valued ? ` · valued ${r.valued}` : ""
         }.` + (errs.length ? ` ⚠️ ${errs.join(" · ")}` : ""),
       );
+      // Same rule as the batch scan: don't tear the samples down unless we got real valuations.
+      if ((r.valued ?? 0) > 0) {
+        setScanned(true);
+        setHideSamples(false);
+      }
       load();
     } catch (err: unknown) {
       setCheckMsg(err instanceof Error ? err.message : "search failed");
@@ -252,6 +267,7 @@ export function DealsPage({
 
   return (
     <>
+      <ValuationStatusBanner />
       <section className="stats">
         <div className="stat">
           <span className="figure">{stats.evaluated}</span>
@@ -325,18 +341,23 @@ export function DealsPage({
             {searching ? "Searching…" : "🔎 Search live listings"}
           </button>
           <button
-            className="linkbtn"
+            className="bought watchbtn"
             onClick={() => onAddCard(cardQuery)}
             disabled={cardQuery.trim().length < 3}
             title="Add this card to the list the scan button searches"
           >
-            ➕ List
+            ★ Watch this card
           </button>
           {checkMsg && <span className="scanmsg">{checkMsg}</span>}
         </div>
         {checks.length > 0 && (
           <>
-            <DealsTable deals={checks} onBuy={onBuy} />
+            <DealsTable
+              deals={checks}
+              onBuy={onBuy}
+              watched={watched}
+              onToggleWatch={toggleWatch}
+            />
             <button className="linkbtn" onClick={() => setChecks([])}>
               Clear checks
             </button>
@@ -477,7 +498,7 @@ export function DealsPage({
         </p>
       )}
       {!loading && !error && !hideSamples && deals.length > 0 && (
-        <DealsTable deals={visible} onBuy={onBuy} />
+        <DealsTable deals={visible} onBuy={onBuy} watched={watched} onToggleWatch={toggleWatch} />
       )}
       {!loading && !error && !hideSamples && deals.length === 0 && (
         <p className="empty">

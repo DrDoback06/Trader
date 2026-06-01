@@ -21,6 +21,7 @@ from .ebay_sell import EbaySellClient, SellConfig
 from .soldprice_chain import ChainSoldPriceProvider
 from .soldprice_pokemontcg import PokemonTcgPriceProvider
 from .soldprice_rapidapi import RapidApiSoldPriceProvider
+from .soldprice_vision import ClaudeEstimateProvider
 from .vision_claude import ClaudeVisionIdentifier
 
 _SANDBOX_OAUTH = "https://api.sandbox.ebay.com/identity/v1/oauth2/token"
@@ -91,6 +92,16 @@ def build_sold_provider(
                 api_key=settings.pokemontcg_api_key or None,
                 eur_gbp=settings.pokemontcg_eur_gbp,
                 usd_gbp=settings.pokemontcg_usd_gbp,
+            )
+        )
+    # Last-resort rough estimate via Claude. Useful for graded slabs (pokemontcg
+    # can't price them) and niche promos no provider has comps for. Heavily flagged
+    # in the UI so it's never confused with real sold-price data.
+    if credentials.is_enabled("vision_estimate") and credentials.is_configured("anthropic_api_key"):
+        providers.append(
+            ClaudeEstimateProvider(
+                credentials.get("anthropic_api_key"),
+                model=settings.anthropic_vision_model,
             )
         )
 
